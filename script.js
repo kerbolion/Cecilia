@@ -615,6 +615,7 @@ function generarCotizacion() {
             nombre: nombreCliente,
             fechaEvento: new Date(fechaEvento).toLocaleDateString(),
             horaEvento: new Date(fechaEvento).toLocaleTimeString(),
+            fechaEventoOriginal: fechaEvento,
             cantidadPersonas,
             formatoEvento
         },
@@ -702,29 +703,60 @@ function mostrarResumenCotizacion() {
 
             <h4 style="color: #2c3e50; margin-bottom: 15px;">Detalle del Menú:</h4>
             <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                    <thead>
-                        <tr style="background: #f8f9fa;">
-                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Producto</th>
-                            <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Precio Unit.</th>
-                            <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Cantidad</th>
-                            <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${cot.productos.map(p => `
-                            <tr>
-                                <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">
-                                    <strong>${p.nombre}</strong>
-                                    ${p.descripcion ? `<br><small style="color: #6c757d;">${p.descripcion}</small>` : ''}
-                                </td>
-                                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">$${p.precio.toFixed(2)}</td>
-                                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">${p.cantidad}</td>
-                                <td style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6; font-weight: 600;">$${p.subtotal.toFixed(2)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                ${(() => {
+                    const categorias = ['recepcion', 'entrada', 'principal', 'postre', 'bebida', 'otros'];
+                    const nombresCategoria = {
+                        'recepcion': '🥂 Recepción',
+                        'entrada': '🥗 Entradas',
+                        'principal': '🍖 Plato Principal',
+                        'postre': '🍰 Postre',
+                        'bebida': '🥤 Bebidas',
+                        'otros': '📦 Otros'
+                    };
+                    
+                    let tablaHtml = '';
+                    
+                    categorias.forEach(categoria => {
+                        const productosCategoria = cot.productos.filter(p => p.categoria === categoria);
+                        
+                        if (productosCategoria.length > 0) {
+                            const subtotalCategoria = productosCategoria.reduce((sum, p) => sum + p.subtotal, 0);
+                            
+                            tablaHtml += `
+                                <div style="margin-bottom: 25px;">
+                                    <h5 style="color: #667eea; margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+                                        ${nombresCategoria[categoria]} - Subtotal: $${subtotalCategoria.toFixed(2)}
+                                    </h5>
+                                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                                        <thead>
+                                            <tr style="background: #f8f9fa;">
+                                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Producto</th>
+                                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Precio Unit.</th>
+                                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Cantidad</th>
+                                                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Subtotal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${productosCategoria.map(p => `
+                                                <tr>
+                                                    <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">
+                                                        <strong>${p.nombre}</strong>
+                                                        ${p.descripcion ? `<br><small style="color: #6c757d;">${p.descripcion}</small>` : ''}
+                                                    </td>
+                                                    <td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">$${p.precio.toFixed(2)}</td>
+                                                    <td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">${p.cantidad}</td>
+                                                    <td style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6; font-weight: 600;">$${p.subtotal.toFixed(2)}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            `;
+                        }
+                    });
+                    
+                    return tablaHtml;
+                })()}
             </div>
 
             <div class="total-section">
@@ -753,45 +785,49 @@ function mostrarResumenCotizacion() {
     container.style.display = 'block';
 }
 
-function limpiarCotizacion() {
-    if (confirm('¿Estás seguro de limpiar el formulario? Se perderán todos los datos ingresados.')) {
-        document.getElementById('nombreCliente').value = '';
-        document.getElementById('fechaEvento').value = '';
-        document.getElementById('cantidadPersonas').value = '';
-        document.getElementById('formatoEvento').value = 'sentado';
+function limpiarCotizacion(sinConfirmacion = false) {
+    if (!sinConfirmacion && !confirm('¿Estás seguro de limpiar el formulario? Se perderán todos los datos ingresados.')) {
+        return;
+    }
+    
+    document.getElementById('nombreCliente').value = '';
+    document.getElementById('fechaEvento').value = '';
+    document.getElementById('cantidadPersonas').value = '';
+    document.getElementById('formatoEvento').value = 'sentado';
 
-        // Limpiar checkboxes
-        document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-            cb.checked = false;
-            cb.closest('.checkbox-item')?.classList.remove('selected');
-        });
+    // Limpiar checkboxes
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+        cb.closest('.checkbox-item')?.classList.remove('selected');
+    });
 
-        // Limpiar productos seleccionados
-        document.querySelectorAll('input[id^="producto_"]').forEach(checkbox => {
-            checkbox.checked = false;
-            const productoId = checkbox.value;
-            const cantidadInput = document.getElementById(`cantidad_${productoId}`);
-            const subtotalDiv = document.getElementById(`subtotal_${productoId}`);
-            
-            if (cantidadInput) {
-                cantidadInput.disabled = true;
-                cantidadInput.value = 1;
-                cantidadInput.max = '';
-            }
-            if (subtotalDiv) {
-                subtotalDiv.textContent = '$0.00';
-            }
-        });
-
-        // Limpiar resumen de validación
-        const resumenValidacion = document.getElementById('resumenValidacion');
-        if (resumenValidacion) {
-            resumenValidacion.remove();
-        }
-
-        // Ocultar resumen
-        document.getElementById('resumenCotizacion').style.display = 'none';
+    // Limpiar productos seleccionados
+    document.querySelectorAll('input[id^="producto_"]').forEach(checkbox => {
+        checkbox.checked = false;
+        const productoId = checkbox.value;
+        const cantidadInput = document.getElementById(`cantidad_${productoId}`);
+        const subtotalDiv = document.getElementById(`subtotal_${productoId}`);
         
+        if (cantidadInput) {
+            cantidadInput.disabled = true;
+            cantidadInput.value = 1;
+            cantidadInput.max = '';
+        }
+        if (subtotalDiv) {
+            subtotalDiv.textContent = '$0.00';
+        }
+    });
+
+    // Limpiar resumen de validación
+    const resumenValidacion = document.getElementById('resumenValidacion');
+    if (resumenValidacion) {
+        resumenValidacion.remove();
+    }
+
+    // Ocultar resumen
+    document.getElementById('resumenCotizacion').style.display = 'none';
+    
+    if (!sinConfirmacion) {
         mostrarAlerta('alertCotizacion', 'Formulario limpiado.', 'success');
     }
 }
@@ -1095,51 +1131,92 @@ function editarCotizacion(index) {
     // Cambiar a la tab del cotizador
     showTab('cotizador');
     
-    // Cargar los datos en el formulario
-    document.getElementById('nombreCliente').value = cot.cliente.nombre;
-    document.getElementById('cantidadPersonas').value = cot.cliente.cantidadPersonas;
-    document.getElementById('formatoEvento').value = cot.cliente.formatoEvento;
+    // Primero limpiar completamente el formulario sin confirmación
+    limpiarCotizacion(true);
     
-    // Convertir fecha y hora de vuelta al formato datetime-local
-    const fechaEvento = new Date(cot.cliente.fechaEvento + ' ' + cot.cliente.horaEvento);
-    const fechaISO = fechaEvento.toISOString().slice(0, 16);
-    document.getElementById('fechaEvento').value = fechaISO;
-
-    // Marcar motivos
-    cot.motivos.forEach(motivo => {
-        const checkbox = document.querySelector(`input[name="motivo"][value="${motivo}"]`);
-        if (checkbox) {
-            checkbox.checked = true;
-            checkbox.closest('.checkbox-item').classList.add('selected');
-        }
-    });
-
-    // Marcar experiencias
-    cot.experiencias.forEach(experiencia => {
-        const checkbox = document.querySelector(`input[name="experiencia"][value="${experiencia}"]`);
-        if (checkbox) {
-            checkbox.checked = true;
-            checkbox.closest('.checkbox-item').classList.add('selected');
-        }
-    });
-
-    // Esperar a que se actualice el menú selector
+    // Esperar a que se complete la limpieza
     setTimeout(() => {
-        // Seleccionar productos
-        cot.productos.forEach(prod => {
-            const checkbox = document.getElementById(`producto_${prod.id}`);
-            const cantidadInput = document.getElementById(`cantidad_${prod.id}`);
-            
-            if (checkbox && cantidadInput) {
-                checkbox.checked = true;
-                cantidadInput.disabled = false;
-                cantidadInput.value = prod.cantidad;
-                calcularTotalProducto(prod.id);
+        // Cargar los datos básicos en el formulario
+        document.getElementById('nombreCliente').value = cot.cliente.nombre;
+        document.getElementById('cantidadPersonas').value = cot.cliente.cantidadPersonas;
+        document.getElementById('formatoEvento').value = cot.cliente.formatoEvento;
+        
+        // Cargar fecha del evento
+        if (cot.cliente.fechaEventoOriginal) {
+            // Usar la fecha original en formato datetime-local
+            document.getElementById('fechaEvento').value = cot.cliente.fechaEventoOriginal;
+        } else {
+            // Fallback para cotizaciones antiguas - intentar reconstruir
+            try {
+                // Convertir de formato local de vuelta a datetime-local
+                const fechaParts = cot.cliente.fechaEvento.split('/'); // dd/mm/yyyy
+                const horaParts = cot.cliente.horaEvento.split(':'); // hh:mm:ss
+                
+                if (fechaParts.length === 3 && horaParts.length >= 2) {
+                    const dia = fechaParts[0].padStart(2, '0');
+                    const mes = fechaParts[1].padStart(2, '0');
+                    const año = fechaParts[2];
+                    const hora = horaParts[0].padStart(2, '0');
+                    const minuto = horaParts[1].padStart(2, '0');
+                    
+                    const fechaISO = `${año}-${mes}-${dia}T${hora}:${minuto}`;
+                    document.getElementById('fechaEvento').value = fechaISO;
+                }
+            } catch (error) {
+                console.warn('Error al convertir fecha:', error);
             }
+        }
+
+        // Limpiar selecciones previas
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+            cb.closest('.checkbox-item')?.classList.remove('selected');
         });
 
-        validarTotalesProductos();
-    }, 100);
+        // Marcar motivos
+        if (cot.motivos && cot.motivos.length > 0) {
+            cot.motivos.forEach(motivo => {
+                const checkbox = document.querySelector(`input[name="motivo"][value="${motivo}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    checkbox.closest('.checkbox-item')?.classList.add('selected');
+                }
+            });
+        }
+
+        // Marcar experiencias
+        if (cot.experiencias && cot.experiencias.length > 0) {
+            cot.experiencias.forEach(experiencia => {
+                const checkbox = document.querySelector(`input[name="experiencia"][value="${experiencia}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    checkbox.closest('.checkbox-item')?.classList.add('selected');
+                }
+            });
+        }
+
+        // Esperar otro momento para cargar productos
+        setTimeout(() => {
+            // Seleccionar productos que aún existen
+            if (cot.productos && cot.productos.length > 0) {
+                cot.productos.forEach(prod => {
+                    const checkbox = document.getElementById(`producto_${prod.id}`);
+                    const cantidadInput = document.getElementById(`cantidad_${prod.id}`);
+                    
+                    if (checkbox && cantidadInput) {
+                        checkbox.checked = true;
+                        cantidadInput.disabled = false;
+                        cantidadInput.value = prod.cantidad;
+                        calcularTotalProducto(prod.id);
+                    } else {
+                        console.warn(`Producto con ID ${prod.id} no encontrado - posiblemente fue eliminado`);
+                    }
+                });
+            }
+
+            validarTotalesProductos();
+        }, 200);
+    }, 200);
 
     // Eliminar la cotización original del historial
     cotizaciones.splice(index, 1);
@@ -1249,4 +1326,72 @@ function limpiarHistorial() {
         cargarHistorialCotizaciones();
         mostrarAlerta('alertHistorial', 'Historial limpiado completamente.', 'success');
     }
+}
+
+function exportarBaseDatos() {
+    const productos = JSON.parse(localStorage.getItem('productos') || '[]');
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    
+    const baseDatos = {
+        productos: productos,
+        cotizaciones: cotizaciones,
+        fechaExportacion: new Date().toISOString(),
+        version: '1.0'
+    };
+    
+    const contenidoJSON = JSON.stringify(baseDatos, null, 2);
+    
+    const blob = new Blob([contenidoJSON], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `base_datos_cotizador_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    mostrarAlerta('alertHistorial', `Base de datos exportada: ${productos.length} productos y ${cotizaciones.length} cotizaciones.`, 'success');
+}
+
+function importarBaseDatos() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const baseDatos = JSON.parse(e.target.result);
+                
+                if (!baseDatos.productos || !baseDatos.cotizaciones) {
+                    throw new Error('Formato de archivo inválido');
+                }
+                
+                if (confirm(`¿Estás seguro de importar esta base de datos?\nProductos: ${baseDatos.productos.length}\nCotizaciones: ${baseDatos.cotizaciones.length}\n\nEsto REEMPLAZARÁ todos los datos actuales.`)) {
+                    localStorage.setItem('productos', JSON.stringify(baseDatos.productos));
+                    localStorage.setItem('cotizaciones', JSON.stringify(baseDatos.cotizaciones));
+                    
+                    // Actualizar las variables globales
+                    productos = baseDatos.productos;
+                    
+                    // Actualizar todas las vistas
+                    actualizarListaProductos();
+                    actualizarMenuSelector();
+                    cargarHistorialCotizaciones();
+                    
+                    mostrarAlerta('alertHistorial', `Base de datos importada exitosamente: ${baseDatos.productos.length} productos y ${baseDatos.cotizaciones.length} cotizaciones.`, 'success');
+                }
+            } catch (error) {
+                mostrarAlerta('alertHistorial', 'Error al importar: archivo inválido o corrupto.', 'error');
+            }
+        };
+        reader.readAsText(file);
+    };
+    
+    input.click();
 }
