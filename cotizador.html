@@ -31,12 +31,7 @@
                 <div class="form-group">
                     <label for="categoriaProducto">Categoría:</label>
                     <select id="categoriaProducto">
-                        <option value="recepcion">Recepción</option>
-                        <option value="entrada">Entrada</option>
-                        <option value="principal">Plato Principal</option>
-                        <option value="postre">Postre</option>
-                        <option value="bebida">Bebidas</option>
-                        <option value="otros">Otros</option>
+                        <!-- Las categorías se cargarán dinámicamente -->
                     </select>
                 </div>
             </div>
@@ -62,6 +57,29 @@
 
             <div id="alertProductos"></div>
 
+            <!-- Gestión de Categorías -->
+            <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #28a745;">
+                <h3 style="color: #28a745; margin-bottom: 20px;">📁 Gestión de Categorías</h3>
+                
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="nuevaCategoria">Nueva Categoría:</label>
+                        <div style="display: flex; gap: 10px; align-items: end;">
+                            <input type="text" id="nuevaCategoria" placeholder="Nombre de la categoría" style="flex: 1;">
+                            <input type="text" id="iconoCategoria" placeholder="🍽️" style="width: 60px; text-align: center;" maxlength="2">
+                            <button class="btn" onclick="agregarCategoria()" style="background: #28a745; color: white;">➕ Agregar</button>
+                        </div>
+                        <small style="color: #6c757d; margin-top: 5px; display: block;">Ingresa el nombre y opcionalmente un emoji para la categoría</small>
+                    </div>
+                </div>
+
+                <div id="alertCategorias" style="margin: 15px 0;"></div>
+
+                <div id="listaCategorias" style="margin-top: 20px;">
+                    <!-- Las categorías se cargarán aquí -->
+                </div>
+            </div>
+
             <div id="listaProductos" class="productos-grid">
                 <!-- Los productos se cargarán aquí -->
             </div>
@@ -69,7 +87,13 @@
 
         <!-- TAB COTIZADOR -->
         <div id="cotizador" class="tab-content">
-            <h2>Nueva Cotización</h2>
+            <h2 id="tituloCotizador">Nueva Cotización</h2>
+            
+            <!-- Indicador de versión cuando se está editando -->
+            <div id="indicadorVersion" style="display: none; margin: 20px 0; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; text-align: center;">
+                <h3 style="margin: 0; color: white;">✏️ Editando Cotización</h3>
+                <p style="margin: 5px 0 0 0; font-size: 1.1rem;" id="nombreVersionEditando"></p>
+            </div>
 
             <!-- Datos del Cliente -->
             <div class="categoria-section">
@@ -94,6 +118,14 @@
                         <select id="formatoEvento">
                             <option value="sentado">Sentado (máx. 55)</option>
                             <option value="parado">Parado (máx. 120)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="estadoCotizacion">Estado de la Cotización:</label>
+                        <select id="estadoCotizacion">
+                            <!-- Los estados se cargarán dinámicamente -->
                         </select>
                     </div>
                 </div>
@@ -201,15 +233,15 @@
                 </div>
             </div>
 
-            <button class="btn btn-success" onclick="generarCotizacion()">📊 Generar Cotización</button>
+            <button class="btn btn-success" id="botonGenerar" onclick="generarCotizacion()">📊 Generar Cotización</button>
             <button class="btn" onclick="limpiarCotizacion()">🔄 Limpiar Formulario</button>
-
-            <div id="alertCotizacion"></div>
 
             <!-- Resumen de Cotización -->
             <div id="resumenCotizacion" style="display: none;">
                 <!-- Se generará dinámicamente -->
             </div>
+
+            <div id="alertCotizacion"></div>
         </div>
 
         <!-- TAB HISTORIAL -->
@@ -234,6 +266,45 @@
 
             <div id="tablaCotizaciones">
                 <!-- Se cargará dinámicamente -->
+            </div>
+
+            <!-- Historial de Versiones -->
+            <div style="margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #28a745;">
+                <h3 style="color: #28a745; margin-bottom: 20px;">🔄 Historial de Versiones</h3>
+                
+                <div style="margin-bottom: 20px; padding: 15px; background: #d1ecf1; border-radius: 8px; color: #0c5460;">
+                    <strong>💡 Sistema de Versiones:</strong> Cada cambio que realizas guarda automáticamente una nueva versión con fecha y hora. Puedes comparar, restaurar o crear ramas desde cualquier versión anterior.
+                </div>
+
+                <div id="alertVersiones" style="margin: 15px 0;"></div>
+
+                <div id="historialVersiones" style="margin-top: 20px;">
+                    <!-- El historial de versiones se cargará aquí -->
+                </div>
+            </div>
+
+            <!-- Gestión de Estados -->
+            <div style="margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #007bff;">
+                <h3 style="color: #007bff; margin-bottom: 20px;">📊 Gestión de Estados de Cotización</h3>
+                
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="nuevoEstado">Nuevo Estado:</label>
+                        <div style="display: flex; gap: 10px; align-items: end;">
+                            <input type="text" id="nuevoEstado" placeholder="Nombre del estado" style="flex: 1;">
+                            <input type="text" id="iconoEstado" placeholder="📋" style="width: 60px; text-align: center;" maxlength="2">
+                            <input type="color" id="colorEstado" value="#6c757d" style="width: 60px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                            <button class="btn" onclick="agregarEstado()" style="background: #007bff; color: white;">➕ Agregar</button>
+                        </div>
+                        <small style="color: #6c757d; margin-top: 5px; display: block;">Ingresa el nombre, emoji y color para el estado</small>
+                    </div>
+                </div>
+
+                <div id="alertEstados" style="margin: 15px 0;"></div>
+
+                <div id="listaEstados" style="margin-top: 20px;">
+                    <!-- Los estados se cargarán aquí -->
+                </div>
             </div>
         </div>
     </div>

@@ -1,6 +1,29 @@
 // Variables globales
 let productos = [];
 let cotizacionActual = {};
+let productoEnEdicion = null; // Para manejar el estado de edición
+let categorias = [
+    { id: 'recepcion', nombre: 'Recepción', icono: '🥂', orden: 1 },
+    { id: 'entrada', nombre: 'Entrada', icono: '🥗', orden: 2 },
+    { id: 'principal', nombre: 'Plato Principal', icono: '🍖', orden: 3 },
+    { id: 'postre', nombre: 'Postre', icono: '🍰', orden: 4 },
+    { id: 'bebida', nombre: 'Bebidas', icono: '🥤', orden: 5 },
+    { id: 'otros', nombre: 'Otros', icono: '📦', orden: 6 }
+];
+let categoriaEnEdicion = null;
+let estadosCotizacion = [
+    { id: 'borrador', nombre: 'Borrador', icono: '📝', color: '#6c757d', orden: 1 },
+    { id: 'enviada', nombre: 'Enviada', icono: '📤', color: '#007bff', orden: 2 },
+    { id: 'revisando', nombre: 'En Revisión', icono: '👀', color: '#ffc107', orden: 3 },
+    { id: 'negociando', nombre: 'Negociando', icono: '💬', color: '#fd7e14', orden: 4 },
+    { id: 'aprobada', nombre: 'Aprobada', icono: '✅', color: '#28a745', orden: 5 },
+    { id: 'rechazada', nombre: 'Rechazada', icono: '❌', color: '#dc3545', orden: 6 },
+    { id: 'cancelada', nombre: 'Cancelada', icono: '🚫', color: '#6c757d', orden: 7 }
+];
+let estadoEnEdicion = null;
+let cotizacionSeleccionada = null; // Para el manejo de versiones
+let editandoCotizacion = false; // Para saber si estamos editando una cotización existente
+let cotizacionOriginalEnEdicion = null; // Para mantener referencia a la cotización original
 
 // Gestión de tabs
 function showTab(tabName) {
@@ -31,7 +54,246 @@ function guardarProductos() {
     localStorage.setItem('productos', JSON.stringify(productos));
 }
 
+// GESTIÓN DE CATEGORÍAS
+function cargarCategorias() {
+    const categoriasGuardadas = JSON.parse(localStorage.getItem('categorias') || '[]');
+    if (categoriasGuardadas.length > 0) {
+        categorias = categoriasGuardadas;
+    }
+}
+
+function guardarCategorias() {
+    localStorage.setItem('categorias', JSON.stringify(categorias));
+}
+
+// GESTIÓN DE ESTADOS DE COTIZACIÓN
+function cargarEstados() {
+    const estadosGuardados = JSON.parse(localStorage.getItem('estadosCotizacion') || '[]');
+    if (estadosGuardados.length > 0) {
+        estadosCotizacion = estadosGuardados;
+    }
+}
+
+function guardarEstados() {
+    localStorage.setItem('estadosCotizacion', JSON.stringify(estadosCotizacion));
+}
+
+function agregarEstado() {
+    if (estadoEnEdicion) {
+        actualizarEstado();
+        return;
+    }
+
+    const nombre = document.getElementById('nuevoEstado').value.trim();
+    const icono = document.getElementById('iconoEstado').value.trim() || '📋';
+    const color = document.getElementById('colorEstado').value;
+
+    if (!nombre) {
+        mostrarAlerta('alertEstados', 'Por favor ingresa el nombre del estado.', 'error');
+        return;
+    }
+
+    if (estadosCotizacion.some(est => est.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertEstados', 'Ya existe un estado con ese nombre.', 'error');
+        return;
+    }
+
+    const siguienteOrden = Math.max(...estadosCotizacion.map(e => e.orden || 0)) + 1;
+    
+    const estado = {
+        id: nombre.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+        nombre,
+        icono,
+        color,
+        orden: siguienteOrden
+    };
+
+    estadosCotizacion.push(estado);
+    guardarEstados();
+    actualizarListaEstados();
+    actualizarSelectEstados();
+    limpiarFormularioEstado();
+    mostrarAlerta('alertEstados', 'Estado agregado exitosamente.', 'success');
+}
+
+function actualizarEstado() {
+    const nombre = document.getElementById('nuevoEstado').value.trim();
+    const icono = document.getElementById('iconoEstado').value.trim() || '📋';
+    const color = document.getElementById('colorEstado').value;
+
+    if (!nombre) {
+        mostrarAlerta('alertEstados', 'Por favor ingresa el nombre del estado.', 'error');
+        return;
+    }
+
+    if (estadosCotizacion.some(est => est.id !== estadoEnEdicion.id && est.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertEstados', 'Ya existe un estado con ese nombre.', 'error');
+        return;
+    }
+
+    const index = estadosCotizacion.findIndex(est => est.id === estadoEnEdicion.id);
+    if (index !== -1) {
+        estadosCotizacion[index] = {
+            ...estadoEnEdicion,
+            nombre,
+            icono,
+            color
+        };
+        
+        guardarEstados();
+        actualizarListaEstados();
+        actualizarSelectEstados();
+        limpiarFormularioEstado();
+        estadoEnEdicion = null;
+        actualizarBotonEstado();
+        mostrarAlerta('alertEstados', 'Estado actualizado exitosamente.', 'success');
+    }
+}
+
+function editarEstado(id) {
+    const estado = estadosCotizacion.find(est => est.id === id);
+    if (estado) {
+        estadoEnEdicion = { ...estado };
+        
+        document.getElementById('nuevoEstado').value = estado.nombre;
+        document.getElementById('iconoEstado').value = estado.icono;
+        document.getElementById('colorEstado').value = estado.color;
+        
+        actualizarBotonEstado();
+        document.getElementById('nuevoEstado').focus();
+        mostrarAlerta('alertEstados', 'Estado cargado para edición.', 'success');
+    }
+}
+
+function eliminarEstado(id) {
+    // Verificar si hay cotizaciones usando este estado
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const cotizacionesConEstado = cotizaciones.filter(cot => cot.estado === id);
+    
+    if (cotizacionesConEstado.length > 0) {
+        mostrarAlerta('alertEstados', `No se puede eliminar el estado porque ${cotizacionesConEstado.length} cotizaciones lo están usando.`, 'error');
+        return;
+    }
+
+    if (confirm('¿Estás seguro de eliminar este estado?')) {
+        estadosCotizacion = estadosCotizacion.filter(est => est.id !== id);
+        guardarEstados();
+        actualizarListaEstados();
+        actualizarSelectEstados();
+        mostrarAlerta('alertEstados', 'Estado eliminado exitosamente.', 'success');
+    }
+}
+
+function limpiarFormularioEstado() {
+    document.getElementById('nuevoEstado').value = '';
+    document.getElementById('iconoEstado').value = '';
+    document.getElementById('colorEstado').value = '#6c757d';
+    estadoEnEdicion = null;
+    actualizarBotonEstado();
+}
+
+function cancelarEdicionEstado() {
+    limpiarFormularioEstado();
+    mostrarAlerta('alertEstados', 'Edición de estado cancelada.', 'success');
+}
+
+function actualizarBotonEstado() {
+    const boton = document.querySelector('button[onclick="agregarEstado()"]');
+    if (boton) {
+        if (estadoEnEdicion) {
+            boton.innerHTML = '✏️ Actualizar';
+            boton.style.background = '#f39c12';
+            
+            if (!document.getElementById('cancelarEdicionEstadoBtn')) {
+                const cancelarBtn = document.createElement('button');
+                cancelarBtn.id = 'cancelarEdicionEstadoBtn';
+                cancelarBtn.className = 'btn';
+                cancelarBtn.innerHTML = '❌ Cancelar';
+                cancelarBtn.onclick = cancelarEdicionEstado;
+                cancelarBtn.style.background = '#95a5a6';
+                boton.parentNode.insertBefore(cancelarBtn, boton.nextSibling);
+            }
+        } else {
+            boton.innerHTML = '➕ Agregar';
+            boton.style.background = '#007bff';
+            
+            const cancelarBtn = document.getElementById('cancelarEdicionEstadoBtn');
+            if (cancelarBtn) {
+                cancelarBtn.remove();
+            }
+        }
+    }
+}
+
+function actualizarListaEstados() {
+    const container = document.getElementById('listaEstados');
+    
+    if (estadosCotizacion.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #6c757d; font-style: italic;">No hay estados personalizados.</p>';
+        return;
+    }
+
+    const estadosOrdenados = estadosCotizacion.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px;">';
+    
+    estadosOrdenados.forEach(estado => {
+        const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+        const cotizacionesConEstado = cotizaciones.filter(cot => cot.estado === estado.id).length;
+        
+        html += `
+            <div style="background: white; padding: 15px; border-radius: 10px; border: 1px solid #dee2e6; border-left: 4px solid ${estado.color};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">${estado.icono}</span>
+                        <strong style="color: ${estado.color};">${estado.nombre}</strong>
+                    </div>
+                    <div style="width: 20px; height: 20px; background: ${estado.color}; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #ddd;"></div>
+                </div>
+                <small style="color: #6c757d; margin-bottom: 15px; display: block;">${cotizacionesConEstado} cotización${cotizacionesConEstado !== 1 ? 'es' : ''}</small>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn" onclick="editarEstado('${estado.id}')" style="font-size: 0.8rem; padding: 6px 10px; background: #f39c12; color: white; flex: 1;">✏️ Editar</button>
+                    <button class="btn btn-danger" onclick="eliminarEstado('${estado.id}')" style="font-size: 0.8rem; padding: 6px 10px; flex: 1;" ${cotizacionesConEstado > 0 ? 'disabled title="No se puede eliminar: tiene cotizaciones asociadas"' : ''}>🗑️</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function actualizarSelectEstados() {
+    const select = document.getElementById('estadoCotizacion');
+    if (!select) return;
+    
+    const valorActual = select.value;
+    
+    select.innerHTML = '';
+    
+    const estadosOrdenados = estadosCotizacion.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    estadosOrdenados.forEach(estado => {
+        const option = document.createElement('option');
+        option.value = estado.id;
+        option.textContent = `${estado.icono} ${estado.nombre}`;
+        option.style.color = estado.color;
+        select.appendChild(option);
+    });
+    
+    if (valorActual && estadosCotizacion.some(est => est.id === valorActual)) {
+        select.value = valorActual;
+    } else if (estadosOrdenados.length > 0) {
+        // Seleccionar el primer estado por defecto (normalmente "Borrador")
+        select.value = estadosOrdenados[0].id;
+    }
+}
+
 function agregarProducto() {
+    if (productoEnEdicion) {
+        actualizarProducto();
+        return;
+    }
+
     const nombre = document.getElementById('nombreProducto').value.trim();
     const categoria = document.getElementById('categoriaProducto').value;
     const costo = parseFloat(document.getElementById('costoProducto').value) || 0;
@@ -43,8 +305,8 @@ function agregarProducto() {
         return;
     }
 
-    if (precio <= 0) {
-        mostrarAlerta('alertProductos', 'El precio debe ser mayor a cero.', 'error');
+    if (precio < 0) {
+        mostrarAlerta('alertProductos', 'El precio no puede ser negativo.', 'error');
         return;
     }
 
@@ -63,6 +325,45 @@ function agregarProducto() {
     actualizarMenuSelector();
     limpiarFormularioProducto();
     mostrarAlerta('alertProductos', 'Producto agregado exitosamente.', 'success');
+}
+
+function actualizarProducto() {
+    const nombre = document.getElementById('nombreProducto').value.trim();
+    const categoria = document.getElementById('categoriaProducto').value;
+    const costo = parseFloat(document.getElementById('costoProducto').value) || 0;
+    const precio = parseFloat(document.getElementById('precioProducto').value) || 0;
+    const descripcion = document.getElementById('descripcionProducto').value.trim();
+
+    if (!nombre) {
+        mostrarAlerta('alertProductos', 'Por favor ingresa el nombre del producto.', 'error');
+        return;
+    }
+
+    if (precio < 0) {
+        mostrarAlerta('alertProductos', 'El precio no puede ser negativo.', 'error');
+        return;
+    }
+
+    // Encontrar y actualizar el producto
+    const index = productos.findIndex(p => p.id === productoEnEdicion.id);
+    if (index !== -1) {
+        productos[index] = {
+            id: productoEnEdicion.id,
+            nombre,
+            categoria,
+            costo,
+            precio,
+            descripcion
+        };
+        
+        guardarProductos();
+        actualizarListaProductos();
+        actualizarMenuSelector();
+        limpiarFormularioProducto();
+        productoEnEdicion = null;
+        actualizarBotonAgregar();
+        mostrarAlerta('alertProductos', 'Producto actualizado exitosamente.', 'success');
+    }
 }
 
 function duplicarProducto(id) {
@@ -84,6 +385,9 @@ function duplicarProducto(id) {
 function editarProducto(id) {
     const producto = productos.find(p => p.id === id);
     if (producto) {
+        // Guardar el producto en edición
+        productoEnEdicion = { ...producto };
+        
         // Llenar el formulario con los datos del producto
         document.getElementById('nombreProducto').value = producto.nombre;
         document.getElementById('categoriaProducto').value = producto.categoria;
@@ -91,15 +395,12 @@ function editarProducto(id) {
         document.getElementById('precioProducto').value = producto.precio;
         document.getElementById('descripcionProducto').value = producto.descripcion;
         
-        // Eliminar el producto original
-        productos = productos.filter(p => p.id !== id);
-        guardarProductos();
-        actualizarListaProductos();
-        actualizarMenuSelector();
+        // Actualizar el botón para mostrar que estamos editando
+        actualizarBotonAgregar();
         
         // Scroll al formulario
         document.getElementById('nombreProducto').focus();
-        mostrarAlerta('alertProductos', 'Producto cargado para edición. Modifica los datos y presiona "Agregar Producto".', 'success');
+        mostrarAlerta('alertProductos', 'Producto cargado para edición. Modifica los datos y presiona "Actualizar Producto".', 'success');
     }
 }
 
@@ -118,6 +419,43 @@ function limpiarFormularioProducto() {
     document.getElementById('costoProducto').value = '';
     document.getElementById('precioProducto').value = '';
     document.getElementById('descripcionProducto').value = '';
+    productoEnEdicion = null;
+    actualizarBotonAgregar();
+}
+
+function cancelarEdicion() {
+    limpiarFormularioProducto();
+    mostrarAlerta('alertProductos', 'Edición cancelada.', 'success');
+}
+
+function actualizarBotonAgregar() {
+    const boton = document.querySelector('button[onclick="agregarProducto()"]');
+    if (boton) {
+        if (productoEnEdicion) {
+            boton.innerHTML = '✏️ Actualizar Producto';
+            boton.style.background = 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)';
+            
+            // Agregar botón de cancelar si no existe
+            if (!document.getElementById('cancelarEdicionBtn')) {
+                const cancelarBtn = document.createElement('button');
+                cancelarBtn.id = 'cancelarEdicionBtn';
+                cancelarBtn.className = 'btn';
+                cancelarBtn.innerHTML = '❌ Cancelar Edición';
+                cancelarBtn.onclick = cancelarEdicion;
+                cancelarBtn.style.background = 'linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)';
+                boton.parentNode.insertBefore(cancelarBtn, boton.nextSibling);
+            }
+        } else {
+            boton.innerHTML = '➕ Agregar Producto';
+            boton.style.background = '';
+            
+            // Remover botón de cancelar si existe
+            const cancelarBtn = document.getElementById('cancelarEdicionBtn');
+            if (cancelarBtn) {
+                cancelarBtn.remove();
+            }
+        }
+    }
 }
 
 function limpiarProductos() {
@@ -130,6 +468,337 @@ function limpiarProductos() {
     }
 }
 
+function agregarCategoria() {
+    if (categoriaEnEdicion) {
+        actualizarCategoria();
+        return;
+    }
+
+    const nombre = document.getElementById('nuevaCategoria').value.trim();
+    const icono = document.getElementById('iconoCategoria').value.trim() || '📦';
+
+    if (!nombre) {
+        mostrarAlerta('alertCategorias', 'Por favor ingresa el nombre de la categoría.', 'error');
+        return;
+    }
+
+    // Verificar que no exista una categoría con el mismo nombre
+    if (categorias.some(cat => cat.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertCategorias', 'Ya existe una categoría con ese nombre.', 'error');
+        return;
+    }
+
+    // Obtener el siguiente número de orden
+    const siguienteOrden = Math.max(...categorias.map(c => c.orden || 0)) + 1;
+    
+    const categoria = {
+        id: nombre.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+        nombre,
+        icono,
+        orden: siguienteOrden
+    };
+
+    categorias.push(categoria);
+    guardarCategorias();
+    actualizarListaCategorias();
+    actualizarSelectCategorias();
+    limpiarFormularioCategoria();
+    mostrarAlerta('alertCategorias', 'Categoría agregada exitosamente.', 'success');
+}
+
+function actualizarCategoria() {
+    const nombre = document.getElementById('nuevaCategoria').value.trim();
+    const icono = document.getElementById('iconoCategoria').value.trim() || '📦';
+
+    if (!nombre) {
+        mostrarAlerta('alertCategorias', 'Por favor ingresa el nombre de la categoría.', 'error');
+        return;
+    }
+
+    // Verificar que no exista otra categoría con el mismo nombre
+    if (categorias.some(cat => cat.id !== categoriaEnEdicion.id && cat.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertCategorias', 'Ya existe una categoría con ese nombre.', 'error');
+        return;
+    }
+
+    const index = categorias.findIndex(cat => cat.id === categoriaEnEdicion.id);
+    if (index !== -1) {
+        categorias[index] = {
+            ...categoriaEnEdicion,
+            nombre,
+            icono
+        };
+        
+        guardarCategorias();
+        actualizarListaCategorias();
+        actualizarSelectCategorias();
+        actualizarListaProductos(); // Por si cambió el nombre/icono
+        actualizarMenuSelector();
+        limpiarFormularioCategoria();
+        categoriaEnEdicion = null;
+        actualizarBotonCategoria();
+        mostrarAlerta('alertCategorias', 'Categoría actualizada exitosamente.', 'success');
+    }
+}
+
+function editarCategoria(id) {
+    const categoria = categorias.find(cat => cat.id === id);
+    if (categoria) {
+        categoriaEnEdicion = { ...categoria };
+        
+        document.getElementById('nuevaCategoria').value = categoria.nombre;
+        document.getElementById('iconoCategoria').value = categoria.icono;
+        
+        actualizarBotonCategoria();
+        document.getElementById('nuevaCategoria').focus();
+        mostrarAlerta('alertCategorias', 'Categoría cargada para edición.', 'success');
+    }
+}
+
+function eliminarCategoria(id) {
+    // Verificar si hay productos usando esta categoría
+    const productosEnCategoria = productos.filter(p => p.categoria === id);
+    
+    if (productosEnCategoria.length > 0) {
+        mostrarAlerta('alertCategorias', `No se puede eliminar la categoría porque tiene ${productosEnCategoria.length} productos asociados.`, 'error');
+        return;
+    }
+
+    if (confirm('¿Estás seguro de eliminar esta categoría?')) {
+        categorias = categorias.filter(cat => cat.id !== id);
+        guardarCategorias();
+        actualizarListaCategorias();
+        actualizarSelectCategorias();
+        mostrarAlerta('alertCategorias', 'Categoría eliminada exitosamente.', 'success');
+    }
+}
+
+function limpiarFormularioCategoria() {
+    document.getElementById('nuevaCategoria').value = '';
+    document.getElementById('iconoCategoria').value = '';
+    categoriaEnEdicion = null;
+    actualizarBotonCategoria();
+}
+
+function cancelarEdicionCategoria() {
+    limpiarFormularioCategoria();
+    mostrarAlerta('alertCategorias', 'Edición de categoría cancelada.', 'success');
+}
+
+function actualizarBotonCategoria() {
+    const boton = document.querySelector('button[onclick="agregarCategoria()"]');
+    if (boton) {
+        if (categoriaEnEdicion) {
+            boton.innerHTML = '✏️ Actualizar';
+            boton.style.background = '#f39c12';
+            
+            if (!document.getElementById('cancelarEdicionCategoriaBtn')) {
+                const cancelarBtn = document.createElement('button');
+                cancelarBtn.id = 'cancelarEdicionCategoriaBtn';
+                cancelarBtn.className = 'btn';
+                cancelarBtn.innerHTML = '❌ Cancelar';
+                cancelarBtn.onclick = cancelarEdicionCategoria;
+                cancelarBtn.style.background = '#95a5a6';
+                boton.parentNode.insertBefore(cancelarBtn, boton.nextSibling);
+            }
+        } else {
+            boton.innerHTML = '➕ Agregar';
+            boton.style.background = '#28a745';
+            
+            const cancelarBtn = document.getElementById('cancelarEdicionCategoriaBtn');
+            if (cancelarBtn) {
+                cancelarBtn.remove();
+            }
+        }
+    }
+}
+
+function actualizarListaCategorias() {
+    const container = document.getElementById('listaCategorias');
+    
+    if (categorias.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #6c757d; font-style: italic;">No hay categorías personalizadas.</p>';
+        return;
+    }
+
+    // Ordenar categorías por orden
+    const categoriasOrdenadas = categorias.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+
+    let html = `
+        <div style="margin-bottom: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; font-size: 0.9rem; color: #1976d2;">
+            💡 <strong>Reordenar categorías:</strong> Arrastra las categorías para cambiar el orden en que aparecen en las cotizaciones
+        </div>
+        <div id="categorias-sortable" style="display: flex; flex-direction: column; gap: 10px;">
+    `;
+    
+    categoriasOrdenadas.forEach((categoria, index) => {
+        const productosEnCategoria = productos.filter(p => p.categoria === categoria.id).length;
+        
+        html += `
+            <div class="categoria-item" draggable="true" data-categoria-id="${categoria.id}" 
+                 style="background: white; padding: 15px; border-radius: 10px; border: 1px solid #dee2e6; 
+                        display: flex; justify-content: space-between; align-items: center; cursor: grab;
+                        transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                 onmouseenter="this.style.boxShadow='0 4px 8px rgba(0,0,0,0.15)'"
+                 onmouseleave="this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)'">
+                
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="cursor: grab; color: #6c757d; font-size: 1.2rem;" title="Arrastra para reordenar">⋮⋮</div>
+                    <div style="background: #f8f9fa; padding: 5px; border-radius: 50%; min-width: 40px; text-align: center;">
+                        <span style="font-size: 1.2rem;">${categoria.icono}</span>
+                    </div>
+                    <div>
+                        <strong style="color: #2c3e50;">${categoria.nombre}</strong>
+                        <br><small style="color: #6c757d;">Orden: ${categoria.orden} • ${productosEnCategoria} producto${productosEnCategoria !== 1 ? 's' : ''}</small>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <div style="display: flex; gap: 5px;">
+                        <button onclick="moverCategoria('${categoria.id}', 'arriba')" style="background: #6c757d; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8rem;" ${index === 0 ? 'disabled' : ''}>↑</button>
+                        <button onclick="moverCategoria('${categoria.id}', 'abajo')" style="background: #6c757d; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8rem;" ${index === categoriasOrdenadas.length - 1 ? 'disabled' : ''}>↓</button>
+                    </div>
+                    <button class="btn" onclick="editarCategoria('${categoria.id}')" style="font-size: 0.8rem; padding: 6px 10px; background: #f39c12; color: white;">✏️ Editar</button>
+                    <button class="btn btn-danger" onclick="eliminarCategoria('${categoria.id}')" style="font-size: 0.8rem; padding: 6px 10px;" ${productosEnCategoria > 0 ? 'disabled title="No se puede eliminar: tiene productos asociados"' : ''}>🗑️</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Agregar eventos de drag and drop
+    inicializarDragAndDrop();
+}
+
+function moverCategoria(categoriaId, direccion) {
+    const categoriasOrdenadas = categorias.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    const index = categoriasOrdenadas.findIndex(cat => cat.id === categoriaId);
+    
+    if (index === -1) return;
+    
+    let nuevoIndex;
+    if (direccion === 'arriba' && index > 0) {
+        nuevoIndex = index - 1;
+    } else if (direccion === 'abajo' && index < categoriasOrdenadas.length - 1) {
+        nuevoIndex = index + 1;
+    } else {
+        return; // No se puede mover más
+    }
+    
+    // Intercambiar los órdenes
+    const categoriaActual = categoriasOrdenadas[index];
+    const categoriaDestino = categoriasOrdenadas[nuevoIndex];
+    
+    const ordenTemporal = categoriaActual.orden;
+    categoriaActual.orden = categoriaDestino.orden;
+    categoriaDestino.orden = ordenTemporal;
+    
+    // Actualizar en el array principal
+    const indexActual = categorias.findIndex(cat => cat.id === categoriaActual.id);
+    const indexDestino = categorias.findIndex(cat => cat.id === categoriaDestino.id);
+    
+    if (indexActual !== -1) categorias[indexActual].orden = categoriaActual.orden;
+    if (indexDestino !== -1) categorias[indexDestino].orden = categoriaDestino.orden;
+    
+    guardarCategorias();
+    actualizarListaCategorias();
+    actualizarSelectCategorias();
+    actualizarListaProductos();
+    actualizarMenuSelector();
+    
+    mostrarAlerta('alertCategorias', 'Orden de categorías actualizado.', 'success');
+}
+
+function inicializarDragAndDrop() {
+    const items = document.querySelectorAll('.categoria-item');
+    let draggedElement = null;
+    
+    items.forEach(item => {
+        item.addEventListener('dragstart', function(e) {
+            draggedElement = this;
+            this.style.opacity = '0.5';
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.outerHTML);
+        });
+        
+        item.addEventListener('dragend', function(e) {
+            this.style.opacity = '1';
+            draggedElement = null;
+        });
+        
+        item.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            this.style.borderTop = '3px solid #667eea';
+        });
+        
+        item.addEventListener('dragleave', function(e) {
+            this.style.borderTop = '1px solid #dee2e6';
+        });
+        
+        item.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.style.borderTop = '1px solid #dee2e6';
+            
+            if (draggedElement !== this) {
+                const draggedId = draggedElement.getAttribute('data-categoria-id');
+                const targetId = this.getAttribute('data-categoria-id');
+                
+                reordenarCategorias(draggedId, targetId);
+            }
+        });
+    });
+}
+
+function reordenarCategorias(draggedId, targetId) {
+    const draggedIndex = categorias.findIndex(cat => cat.id === draggedId);
+    const targetIndex = categorias.findIndex(cat => cat.id === targetId);
+    
+    if (draggedIndex === -1 || targetIndex === -1) return;
+    
+    const draggedCategory = categorias[draggedIndex];
+    const targetCategory = categorias[targetIndex];
+    
+    // Intercambiar órdenes
+    const ordenTemporal = draggedCategory.orden;
+    draggedCategory.orden = targetCategory.orden;
+    targetCategory.orden = ordenTemporal;
+    
+    guardarCategorias();
+    actualizarListaCategorias();
+    actualizarSelectCategorias();
+    actualizarListaProductos();
+    actualizarMenuSelector();
+    
+    mostrarAlerta('alertCategorias', 'Categorías reordenadas exitosamente.', 'success');
+}
+
+function actualizarSelectCategorias() {
+    const select = document.getElementById('categoriaProducto');
+    if (!select) return;
+    
+    const valorActual = select.value;
+    
+    // Limpiar opciones actuales
+    select.innerHTML = '';
+    
+    // Agregar todas las categorías ordenadas
+    const categoriasOrdenadas = categorias.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    categoriasOrdenadas.forEach(categoria => {
+        const option = document.createElement('option');
+        option.value = categoria.id;
+        option.textContent = `${categoria.icono} ${categoria.nombre}`;
+        select.appendChild(option);
+    });
+    
+    // Restaurar valor si aún existe
+    if (valorActual && categorias.some(cat => cat.id === valorActual)) {
+        select.value = valorActual;
+    }
+}
+
 function actualizarListaProductos() {
     const container = document.getElementById('listaProductos');
     
@@ -138,23 +807,15 @@ function actualizarListaProductos() {
         return;
     }
 
-    const categorias = ['recepcion', 'entrada', 'principal', 'postre', 'bebida', 'otros'];
-    const nombresCategoria = {
-        'recepcion': '🥂 Recepción',
-        'entrada': '🥗 Entradas',
-        'principal': '🍖 Platos Principales',
-        'postre': '🍰 Postres',
-        'bebida': '🥤 Bebidas',
-        'otros': '📦 Otros'
-    };
+    const categoriasOrdenadas = categorias.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
     let html = '';
     
-    categorias.forEach(categoria => {
-        const productosCategoria = productos.filter(p => p.categoria === categoria);
+    categoriasOrdenadas.forEach(categoria => {
+        const productosCategoria = productos.filter(p => p.categoria === categoria.id);
         
         if (productosCategoria.length > 0) {
-            html += `<div style="grid-column: 1 / -1;"><h3 style="color: #667eea; margin-bottom: 15px; border-bottom: 2px solid #667eea; padding-bottom: 10px;">${nombresCategoria[categoria]}</h3></div>`;
+            html += `<div style="grid-column: 1 / -1;"><h3 style="color: #667eea; margin-bottom: 15px; border-bottom: 2px solid #667eea; padding-bottom: 10px;">${categoria.icono} ${categoria.nombre}</h3></div>`;
             
             productosCategoria.forEach(producto => {
                 const margen = producto.precio - producto.costo;
@@ -206,23 +867,18 @@ function actualizarMenuSelector() {
         return;
     }
 
-    const categorias = ['recepcion', 'entrada', 'principal', 'postre'];
-    const nombresCategoria = {
-        'recepcion': '🥂 Recepción',
-        'entrada': '🥗 Entradas',
-        'principal': '🍖 Plato Principal',
-        'postre': '🍰 Postre'
-    };
+    // Usar todas las categorías que tienen productos, ordenadas
+    const categoriasDisponibles = categorias.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
     let html = '';
     
-    categorias.forEach(categoria => {
-        const productosCategoria = productos.filter(p => p.categoria === categoria);
+    categoriasDisponibles.forEach(categoria => {
+        const productosCategoria = productos.filter(p => p.categoria === categoria.id);
         
         if (productosCategoria.length > 0) {
             html += `
                 <div class="menu-selector">
-                    <h4 style="color: #667eea; margin-bottom: 15px;">${nombresCategoria[categoria]}</h4>
+                    <h4 style="color: #667eea; margin-bottom: 15px;">${categoria.icono} ${categoria.nombre}</h4>
                     <div style="display: grid; gap: 15px;">
                         ${productosCategoria.map(p => `
                             <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 15px; align-items: center; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 2px solid #e1e8ed;">
@@ -442,7 +1098,7 @@ function validarTotalesProductos() {
     if (cantidadPersonas === 0) return true;
     
     // Agrupar productos por categoría y calcular totales
-    const categorias = ['recepcion', 'entrada', 'principal', 'postre'];
+    const categoriasValidacion = categorias.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
     let resumenContainer = document.getElementById('resumenValidacion');
     
     if (!resumenContainer) {
@@ -460,15 +1116,8 @@ function validarTotalesProductos() {
     let resumenHtml = '';
     let hayErrores = false;
     
-    const nombresCategoria = {
-        'recepcion': '🥂 Recepción',
-        'entrada': '🥗 Entradas',  
-        'principal': '🍖 Plato Principal',
-        'postre': '🍰 Postre'
-    };
-    
-    categorias.forEach(categoria => {
-        const productosCategoria = productos.filter(p => p.categoria === categoria);
+    categoriasValidacion.forEach(categoria => {
+        const productosCategoria = productos.filter(p => p.categoria === categoria.id);
         let totalCategoria = 0;
         let productosSeleccionados = [];
         
@@ -498,7 +1147,7 @@ function validarTotalesProductos() {
             resumenHtml += `
                 <div style="margin-bottom: 15px; padding: 10px; background: white; border-radius: 8px; border-left: 3px solid ${colorEstado};">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <strong style="color: ${colorEstado};">${iconoEstado} ${nombresCategoria[categoria]}</strong>
+                        <strong style="color: ${colorEstado};">${iconoEstado} ${categoria.icono} ${categoria.nombre}</strong>
                         <span style="font-weight: 600; color: ${colorEstado};">
                             ${totalCategoria}/${cantidadPersonas} personas
                         </span>
@@ -543,6 +1192,7 @@ function generarCotizacion() {
     const fechaEvento = document.getElementById('fechaEvento').value;
     const cantidadPersonas = parseInt(document.getElementById('cantidadPersonas').value);
     const formatoEvento = document.getElementById('formatoEvento').value;
+    const estadoSeleccionado = document.getElementById('estadoCotizacion').value;
 
     if (!nombreCliente) {
         mostrarAlerta('alertCotizacion', 'Por favor ingresa el nombre del cliente.', 'error');
@@ -611,6 +1261,7 @@ function generarCotizacion() {
     cotizacionActual = {
         id: Date.now(),
         fechaCotizacion: new Date().toLocaleDateString(),
+        estado: estadoSeleccionado,
         cliente: {
             nombre: nombreCliente,
             fechaEvento: new Date(fechaEvento).toLocaleDateString(),
@@ -660,6 +1311,9 @@ function mostrarResumenCotizacion() {
         'brunch': '🥞 Brunch'
     };
 
+    // Obtener información del estado
+    const estadoCotizacion = estadosCotizacion.find(est => est.id === cot.estado) || estadosCotizacion[0];
+
     let html = `
         <div class="cotizacion-resumen">
             <h3 style="color: #667eea; margin-bottom: 20px; text-align: center;">📊 Resumen de Cotización</h3>
@@ -668,6 +1322,13 @@ function mostrarResumenCotizacion() {
                 <div class="info-box">
                     <div class="info-label">Cliente</div>
                     <div class="info-value">${cot.cliente.nombre}</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Estado</div>
+                    <div class="info-value" style="color: ${estadoCotizacion.color}; display: flex; align-items: center; gap: 5px;">
+                        <span>${estadoCotizacion.icono}</span>
+                        <span>${estadoCotizacion.nombre}</span>
+                    </div>
                 </div>
                 <div class="info-box">
                     <div class="info-label">Fecha del Evento</div>
@@ -704,20 +1365,12 @@ function mostrarResumenCotizacion() {
             <h4 style="color: #2c3e50; margin-bottom: 15px;">Detalle del Menú:</h4>
             <div style="overflow-x: auto;">
                 ${(() => {
-                    const categorias = ['recepcion', 'entrada', 'principal', 'postre', 'bebida', 'otros'];
-                    const nombresCategoria = {
-                        'recepcion': '🥂 Recepción',
-                        'entrada': '🥗 Entradas',
-                        'principal': '🍖 Plato Principal',
-                        'postre': '🍰 Postre',
-                        'bebida': '🥤 Bebidas',
-                        'otros': '📦 Otros'
-                    };
+                    const categoriasResumen = categorias.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
                     
                     let tablaHtml = '';
                     
-                    categorias.forEach(categoria => {
-                        const productosCategoria = cot.productos.filter(p => p.categoria === categoria);
+                    categoriasResumen.forEach(categoria => {
+                        const productosCategoria = cot.productos.filter(p => p.categoria === categoria.id);
                         
                         if (productosCategoria.length > 0) {
                             const subtotalCategoria = productosCategoria.reduce((sum, p) => sum + p.subtotal, 0);
@@ -725,7 +1378,7 @@ function mostrarResumenCotizacion() {
                             tablaHtml += `
                                 <div style="margin-bottom: 25px;">
                                     <h5 style="color: #667eea; margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
-                                        ${nombresCategoria[categoria]} - Subtotal: $${subtotalCategoria.toFixed(2)}
+                                        ${categoria.icono} ${categoria.nombre} - Subtotal: $${subtotalCategoria.toFixed(2)}
                                     </h5>
                                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                                         <thead>
@@ -794,6 +1447,12 @@ function limpiarCotizacion(sinConfirmacion = false) {
     document.getElementById('fechaEvento').value = '';
     document.getElementById('cantidadPersonas').value = '';
     document.getElementById('formatoEvento').value = 'sentado';
+    
+    // Restablecer estado al primero (normalmente "Borrador")
+    const estadosOrdenados = estadosCotizacion.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    if (estadosOrdenados.length > 0 && document.getElementById('estadoCotizacion')) {
+        document.getElementById('estadoCotizacion').value = estadosOrdenados[0].id;
+    }
 
     // Limpiar checkboxes
     document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
@@ -827,6 +1486,11 @@ function limpiarCotizacion(sinConfirmacion = false) {
     // Ocultar resumen
     document.getElementById('resumenCotizacion').style.display = 'none';
     
+    // Salir del modo edición si estábamos editando
+    if (editandoCotizacion) {
+        salirModoEdicion();
+    }
+    
     if (!sinConfirmacion) {
         mostrarAlerta('alertCotizacion', 'Formulario limpiado.', 'success');
     }
@@ -839,13 +1503,588 @@ function guardarCotizacion() {
     }
 
     let cotizacionesGuardadas = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-    cotizacionesGuardadas.push(cotizacionActual);
+    
+    // Buscar si ya existe esta cotización (por ID)
+    const index = cotizacionesGuardadas.findIndex(cot => cot.id === cotizacionActual.id);
+
+    if (index !== -1) {
+        // Si existe, crear una nueva versión
+        const cotizacionExistente = cotizacionesGuardadas[index];
+        crearNuevaVersion(cotizacionExistente, cotizacionActual);
+        cotizacionesGuardadas[index] = cotizacionExistente;
+    } else {
+        // Si no existe, crear nueva cotización con versión inicial
+        const ahora = new Date();
+        const fechaHora = `${ahora.toLocaleDateString()} ${ahora.toLocaleTimeString()}`;
+        
+        // Crear una copia completa SIN las versiones para guardar en el historial
+        const datosParaVersion = { ...cotizacionActual };
+        delete datosParaVersion.versiones;
+        delete datosParaVersion.versionActual;
+        
+        cotizacionActual.versiones = [{
+            version: 1,
+            fecha: ahora.toISOString(),
+            datos: datosParaVersion,
+            descripcion: `v1 - ${fechaHora}`
+        }];
+        cotizacionActual.versionActual = 1;
+        cotizacionesGuardadas.push(cotizacionActual);
+    }
+    
     localStorage.setItem('cotizaciones', JSON.stringify(cotizacionesGuardadas));
     
     // Actualizar el historial automáticamente
     cargarHistorialCotizaciones();
     
     mostrarAlerta('alertCotizacion', 'Cotización guardada exitosamente.', 'success');
+    
+    // Si estábamos editando, volver al modo normal
+    if (editandoCotizacion) {
+        salirModoEdicion();
+    }
+}
+
+function entrarModoEdicion(cotizacionOriginal) {
+    editandoCotizacion = true;
+    cotizacionOriginalEnEdicion = cotizacionOriginal;
+    
+    // Calcular próxima versión
+    const proximaVersion = Math.max(...cotizacionOriginal.versiones.map(v => v.version)) + 1;
+    const ahora = new Date();
+    const fechaHora = `${ahora.toLocaleDateString()} ${ahora.toLocaleTimeString()}`;
+    
+    // Mostrar indicador de versión
+    const indicador = document.getElementById('indicadorVersion');
+    const nombreVersion = document.getElementById('nombreVersionEditando');
+    const titulo = document.getElementById('tituloCotizador');
+    const boton = document.getElementById('botonGenerar');
+    
+    if (indicador) indicador.style.display = 'block';
+    if (nombreVersion) nombreVersion.textContent = `v${proximaVersion} - ${fechaHora}`;
+    if (titulo) titulo.textContent = 'Editando Cotización';
+    if (boton) {
+        boton.innerHTML = '💾 Guardar Nueva Versión';
+        boton.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+    }
+}
+
+function salirModoEdicion() {
+    editandoCotizacion = false;
+    cotizacionOriginalEnEdicion = null;
+    
+    // Ocultar indicador de versión
+    const indicador = document.getElementById('indicadorVersion');
+    const titulo = document.getElementById('tituloCotizador');
+    const boton = document.getElementById('botonGenerar');
+    
+    if (indicador) indicador.style.display = 'none';
+    if (titulo) titulo.textContent = 'Nueva Cotización';
+    if (boton) {
+        boton.innerHTML = '📊 Generar Cotización';
+        boton.style.background = '';
+    }
+}
+
+function crearNuevaVersion(cotizacionExistente, nuevosDatos) {
+    if (!cotizacionExistente.versiones) {
+        // Migrar cotización antigua al sistema de versiones
+        const fechaOriginal = new Date(cotizacionExistente.fechaCotizacion + 'T00:00:00');
+        const fechaHoraMigrada = `${fechaOriginal.toLocaleDateString()} ${fechaOriginal.toLocaleTimeString()}`;
+        
+        // Crear una copia completa de los datos originales SIN las versiones
+        const datosOriginales = { ...cotizacionExistente };
+        delete datosOriginales.versiones;
+        delete datosOriginales.versionActual;
+        
+        cotizacionExistente.versiones = [{
+            version: 1,
+            fecha: fechaOriginal.toISOString(),
+            datos: datosOriginales,
+            descripcion: `v1 - ${fechaHoraMigrada} (migrada)`
+        }];
+        cotizacionExistente.versionActual = 1;
+    }
+
+    const siguienteVersion = Math.max(...cotizacionExistente.versiones.map(v => v.version)) + 1;
+    const ahora = new Date();
+    const fechaHora = `${ahora.toLocaleDateString()} ${ahora.toLocaleTimeString()}`;
+    
+    // Crear una copia completa de los nuevos datos SIN las versiones
+    const datosNuevos = { ...nuevosDatos };
+    delete datosNuevos.versiones;
+    delete datosNuevos.versionActual;
+    
+    // Agregar nueva versión
+    cotizacionExistente.versiones.push({
+        version: siguienteVersion,
+        fecha: ahora.toISOString(),
+        datos: datosNuevos,
+        descripcion: `v${siguienteVersion} - ${fechaHora}`
+    });
+
+    // Actualizar datos principales con la nueva versión
+    Object.assign(cotizacionExistente, nuevosDatos);
+    cotizacionExistente.versionActual = siguienteVersion;
+}
+
+function editarCotizacionParaNuevaVersion(cotizacionId) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const index = cotizaciones.findIndex(cot => cot.id === cotizacionId);
+    
+    if (index === -1) {
+        mostrarAlerta('alertVersiones', 'Cotización no encontrada.', 'error');
+        return;
+    }
+
+    // Cargar la cotización actual en el formulario
+    editarCotizacion(index);
+    
+    // Cambiar al tab del cotizador
+    showTab('cotizador');
+    
+    mostrarAlerta('alertCotizacion', 'Cotización cargada. Al guardar se creará automáticamente una nueva versión.', 'success');
+}
+
+function mostrarHistorialVersiones(cotizacionId) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const cotizacion = cotizaciones.find(cot => cot.id === cotizacionId);
+    
+    if (!cotizacion) {
+        mostrarAlerta('alertVersiones', 'Cotización no encontrada.', 'error');
+        return;
+    }
+
+    cotizacionSeleccionada = cotizacion;
+    
+    const container = document.getElementById('historialVersiones');
+    
+    if (!cotizacion.versiones || cotizacion.versiones.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #6c757d;">
+                <p>Esta cotización no tiene historial de versiones.</p>
+                <button class="btn" onclick="migrarCotizacionAVersiones(${cotizacionId})" style="background: #28a745; color: white;">
+                    📝 Crear Sistema de Versiones
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="color: #28a745; margin: 0;">📋 ${cotizacion.cliente.nombre} - ${cotizacion.cliente.fechaEvento}</h4>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" onclick="editarCotizacionParaNuevaVersion(${cotizacionId})" style="background: #007bff; color: white;">
+                    ✏️ Editar (Nueva Versión)
+                </button>
+                <button class="btn" onclick="cerrarHistorialVersiones()" style="background: #6c757d; color: white;">
+                    ❌ Cerrar
+                </button>
+            </div>
+        </div>
+        
+        <div style="display: grid; gap: 15px;">
+    `;
+
+    const versionesOrdenadas = cotizacion.versiones.slice().sort((a, b) => b.version - a.version);
+    
+    versionesOrdenadas.forEach(version => {
+        const fechaFormateada = new Date(version.fecha).toLocaleString();
+        const esVersionActual = version.version === cotizacion.versionActual;
+        
+        html += `
+            <div style="background: white; border-radius: 10px; border: 2px solid ${esVersionActual ? '#28a745' : '#dee2e6'}; padding: 20px; position: relative;">
+                ${esVersionActual ? `
+                    <div style="position: absolute; top: -10px; right: 15px; background: #28a745; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">
+                        ACTUAL
+                    </div>
+                ` : ''}
+                
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                    <div>
+                        <h5 style="color: #2c3e50; margin: 0 0 5px 0;">
+                            🔄 Versión ${version.version}
+                            ${esVersionActual ? ' (Actual)' : ''}
+                        </h5>
+                        <p style="margin: 0; color: #6c757d; font-size: 0.9rem;">
+                            ${version.descripcion}
+                        </p>
+                        <small style="color: #6c757d;">
+                            📅 ${fechaFormateada}
+                        </small>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn" onclick="verDetalleVersion(${cotizacionId}, ${version.version})" style="font-size: 0.8rem; padding: 6px 10px; background: #17a2b8; color: white;">
+                            👁️ Ver
+                        </button>
+                        <button class="btn" onclick="compararVersion(${cotizacionId}, ${version.version})" style="font-size: 0.8rem; padding: 6px 10px; background: #ffc107; color: black;">
+                            ⚖️ Comparar
+                        </button>
+                        ${!esVersionActual ? `
+                            <button class="btn" onclick="restaurarVersion(${cotizacionId}, ${version.version})" style="font-size: 0.8rem; padding: 6px 10px; background: #28a745; color: white;">
+                                🔄 Restaurar
+                            </button>
+                            <button class="btn" onclick="crearRamaDesdeVersion(${cotizacionId}, ${version.version})" style="font-size: 0.8rem; padding: 6px 10px; background: #6f42c1; color: white;">
+                                🌿 Crear Rama
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; font-size: 0.9rem;">
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 8px;">
+                        <strong>Total:</strong> $${version.datos.totales?.subtotal?.toFixed(2) || '0.00'}
+                    </div>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 8px;">
+                        <strong>Productos:</strong> ${version.datos.productos?.length || 0}
+                    </div>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 8px;">
+                        <strong>Estado:</strong> ${getEstadoNombre(version.datos.estado)}
+                    </div>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 8px;">
+                        <strong>Personas:</strong> ${version.datos.cliente?.cantidadPersonas || 0}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function getEstadoNombre(estadoId) {
+    const estado = estadosCotizacion.find(est => est.id === estadoId);
+    return estado ? `${estado.icono} ${estado.nombre}` : '❓ Sin estado';
+}
+
+function cerrarHistorialVersiones() {
+    const container = document.getElementById('historialVersiones');
+    container.innerHTML = '<p style="text-align: center; color: #6c757d; font-style: italic;">Selecciona una cotización de la tabla para ver su historial de versiones.</p>';
+    cotizacionSeleccionada = null;
+}
+
+function migrarCotizacionAVersiones(cotizacionId) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const index = cotizaciones.findIndex(cot => cot.id === cotizacionId);
+    
+    if (index === -1) return;
+    
+    const cotizacion = cotizaciones[index];
+    
+    // Crear sistema de versiones para cotización existente
+    const fechaOriginal = new Date(cotizacion.fechaCotizacion + 'T00:00:00');
+    const fechaHora = `${fechaOriginal.toLocaleDateString()} ${fechaOriginal.toLocaleTimeString()}`;
+    
+    cotizacion.versiones = [{
+        version: 1,
+        fecha: fechaOriginal.toISOString(),
+        datos: { ...cotizacion },
+        descripcion: `v1 - ${fechaHora} (migrada)`
+    }];
+    cotizacion.versionActual = 1;
+    
+    localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
+    
+    mostrarHistorialVersiones(cotizacionId);
+    mostrarAlerta('alertVersiones', 'Sistema de versiones creado exitosamente.', 'success');
+}
+
+function verDetalleVersion(cotizacionId, numeroVersion) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const cotizacion = cotizaciones.find(cot => cot.id === cotizacionId);
+    
+    if (!cotizacion) return;
+    
+    const version = cotizacion.versiones.find(v => v.version === numeroVersion);
+    if (!version) return;
+    
+    // Mostrar los datos de esta versión en un modal
+    const modalHtml = `
+        <div id="modalVersionDetalle" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center;" onclick="cerrarModalVersion()">
+            <div style="background: white; border-radius: 15px; padding: 30px; max-width: 800px; max-height: 90vh; overflow-y: auto; margin: 20px;" onclick="event.stopPropagation()">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #28a745; padding-bottom: 15px;">
+                    <h3 style="color: #28a745; margin: 0;">🔄 Versión ${version.version} - ${version.descripcion}</h3>
+                    <button onclick="cerrarModalVersion()" style="background: #dc3545; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <strong>📅 Fecha de creación:</strong> ${new Date(version.fecha).toLocaleString()}
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <strong>Cliente:</strong><br>${version.datos.cliente?.nombre || 'N/A'}
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <strong>Estado:</strong><br>${getEstadoNombre(version.datos.estado)}
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <strong>Personas:</strong><br>${version.datos.cliente?.cantidadPersonas || 0}
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <strong>Total:</strong><br><span style="color: #28a745; font-weight: 700; font-size: 1.2rem;">$${version.datos.totales?.subtotal?.toFixed(2) || '0.00'}</span>
+                    </div>
+                </div>
+
+                <h4 style="color: #2c3e50; margin-bottom: 15px;">Productos en esta versión:</h4>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    ${version.datos.productos?.map(p => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; margin-bottom: 10px; border-radius: 8px;">
+                            <div>
+                                <strong>${p.nombre}</strong>
+                                <br><small style="color: #6c757d;">Cantidad: ${p.cantidad}</small>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-weight: 600; color: #28a745;">$${p.subtotal?.toFixed(2) || '0.00'}</div>
+                                <small style="color: #6c757d;">$${p.precio?.toFixed(2) || '0.00'} c/u</small>
+                            </div>
+                        </div>
+                    `).join('') || '<p style="text-align: center; color: #6c757d;">No hay productos en esta versión</p>'}
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function cerrarModalVersion() {
+    const modal = document.getElementById('modalVersionDetalle');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function compararVersion(cotizacionId, numeroVersion) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const cotizacion = cotizaciones.find(cot => cot.id === cotizacionId);
+    
+    if (!cotizacion) return;
+    
+    const versionAnterior = cotizacion.versiones.find(v => v.version === numeroVersion);
+    const versionActual = cotizacion.versiones.find(v => v.version === cotizacion.versionActual);
+    
+    if (!versionAnterior || !versionActual) return;
+    
+    // Función para generar resumen de productos
+    function generarResumenProductos(productos) {
+        if (!productos || productos.length === 0) {
+            return '<p style="color: #6c757d; font-style: italic;">Sin productos</p>';
+        }
+        
+        return productos.map(p => `
+            <div style="display: flex; justify-content: space-between; padding: 8px; background: #f8f9fa; margin-bottom: 5px; border-radius: 5px; font-size: 0.9rem;">
+                <span><strong>${p.nombre}</strong> (x${p.cantidad})</span>
+                <span style="color: #28a745; font-weight: 600;">$${p.subtotal?.toFixed(2) || '0.00'}</span>
+            </div>
+        `).join('');
+    }
+    
+    // Función para generar resumen de motivos y experiencias
+    function generarResumenAdicionales(motivos, experiencias) {
+        let html = '';
+        if (motivos && motivos.length > 0) {
+            html += '<div style="margin-bottom: 10px;"><strong>Motivos:</strong><br>' + motivos.join(', ') + '</div>';
+        }
+        if (experiencias && experiencias.length > 0) {
+            html += '<div><strong>Experiencias:</strong><br>' + experiencias.join(', ') + '</div>';
+        }
+        return html || '<p style="color: #6c757d; font-style: italic;">Sin motivos o experiencias</p>';
+    }
+    
+    // Mostrar comparación en modal
+    const modalHtml = `
+        <div id="modalComparacion" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center;" onclick="cerrarModalComparacion()">
+            <div style="background: white; border-radius: 15px; padding: 30px; max-width: 1200px; max-height: 90vh; overflow-y: auto; margin: 20px; width: 95%;" onclick="event.stopPropagation()">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #ffc107; padding-bottom: 15px;">
+                    <h3 style="color: #ffc107; margin: 0;">⚖️ Comparación Detallada de Versiones</h3>
+                    <button onclick="cerrarModalComparacion()" style="background: #dc3545; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Versión Anterior -->
+                    <div style="border: 2px solid #dc3545; border-radius: 10px; padding: 15px;">
+                        <h4 style="color: #dc3545; margin-top: 0;">📋 Versión ${versionAnterior.version} - ${versionAnterior.descripcion}</h4>
+                        
+                        <div style="background: #fff5f5; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                            <p><strong>📅 Fecha:</strong> ${new Date(versionAnterior.fecha).toLocaleString()}</p>
+                            <p><strong>👤 Cliente:</strong> ${versionAnterior.datos.cliente?.nombre || 'N/A'}</p>
+                            <p><strong>📊 Estado:</strong> ${getEstadoNombre(versionAnterior.datos.estado)}</p>
+                            <p><strong>👥 Personas:</strong> ${versionAnterior.datos.cliente?.cantidadPersonas || 0}</p>
+                            <p><strong>📍 Formato:</strong> ${versionAnterior.datos.cliente?.formatoEvento || 'N/A'}</p>
+                        </div>
+                        
+                        <div style="background: #fff5f5; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                            <h5 style="color: #dc3545; margin-top: 0;">💰 Totales:</h5>
+                            <p><strong>Subtotal:</strong> $${versionAnterior.datos.totales?.subtotal?.toFixed(2) || '0.00'}</p>
+                            <p><strong>IVA:</strong> $${versionAnterior.datos.totales?.iva?.toFixed(2) || '0.00'}</p>
+                            <p><strong>Total:</strong> $${versionAnterior.datos.totales?.total?.toFixed(2) || '0.00'}</p>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <h5 style="color: #dc3545; margin-bottom: 10px;">🍽️ Productos (${versionAnterior.datos.productos?.length || 0}):</h5>
+                            <div style="max-height: 200px; overflow-y: auto;">
+                                ${generarResumenProductos(versionAnterior.datos.productos)}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h5 style="color: #dc3545; margin-bottom: 10px;">🎉 Motivos y Experiencias:</h5>
+                            <div style="background: #fff5f5; padding: 10px; border-radius: 8px; font-size: 0.9rem;">
+                                ${generarResumenAdicionales(versionAnterior.datos.motivos, versionAnterior.datos.experiencias)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Versión Actual -->
+                    <div style="border: 2px solid #28a745; border-radius: 10px; padding: 15px;">
+                        <h4 style="color: #28a745; margin-top: 0;">📋 Versión ${versionActual.version} - ${versionActual.descripcion}</h4>
+                        
+                        <div style="background: #f8fff8; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                            <p><strong>📅 Fecha:</strong> ${new Date(versionActual.fecha).toLocaleString()}</p>
+                            <p><strong>👤 Cliente:</strong> ${versionActual.datos.cliente?.nombre || 'N/A'}</p>
+                            <p><strong>📊 Estado:</strong> ${getEstadoNombre(versionActual.datos.estado)}</p>
+                            <p><strong>👥 Personas:</strong> ${versionActual.datos.cliente?.cantidadPersonas || 0}</p>
+                            <p><strong>📍 Formato:</strong> ${versionActual.datos.cliente?.formatoEvento || 'N/A'}</p>
+                        </div>
+                        
+                        <div style="background: #f8fff8; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                            <h5 style="color: #28a745; margin-top: 0;">💰 Totales:</h5>
+                            <p><strong>Subtotal:</strong> $${versionActual.datos.totales?.subtotal?.toFixed(2) || '0.00'}</p>
+                            <p><strong>IVA:</strong> $${versionActual.datos.totales?.iva?.toFixed(2) || '0.00'}</p>
+                            <p><strong>Total:</strong> $${versionActual.datos.totales?.total?.toFixed(2) || '0.00'}</p>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <h5 style="color: #28a745; margin-bottom: 10px;">🍽️ Productos (${versionActual.datos.productos?.length || 0}):</h5>
+                            <div style="max-height: 200px; overflow-y: auto;">
+                                ${generarResumenProductos(versionActual.datos.productos)}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h5 style="color: #28a745; margin-bottom: 10px;">🎉 Motivos y Experiencias:</h5>
+                            <div style="background: #f8fff8; padding: 10px; border-radius: 8px; font-size: 0.9rem;">
+                                ${generarResumenAdicionales(versionActual.datos.motivos, versionActual.datos.experiencias)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                    <h5 style="margin-bottom: 10px;">📊 Resumen de Cambios:</h5>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div>
+                            <strong>💰 Diferencia Total:</strong><br>
+                            <span style="font-size: 1.2rem; font-weight: 600; color: ${(versionActual.datos.totales?.total || 0) > (versionAnterior.datos.totales?.total || 0) ? '#28a745' : '#dc3545'};">
+                                ${(versionActual.datos.totales?.total || 0) > (versionAnterior.datos.totales?.total || 0) ? '+' : ''}$${((versionActual.datos.totales?.total || 0) - (versionAnterior.datos.totales?.total || 0)).toFixed(2)}
+                            </span>
+                        </div>
+                        <div>
+                            <strong>🍽️ Diferencia Productos:</strong><br>
+                            <span style="font-size: 1.2rem; font-weight: 600; color: ${(versionActual.datos.productos?.length || 0) > (versionAnterior.datos.productos?.length || 0) ? '#28a745' : (versionActual.datos.productos?.length || 0) < (versionAnterior.datos.productos?.length || 0) ? '#dc3545' : '#6c757d'};">
+                                ${(versionActual.datos.productos?.length || 0) > (versionAnterior.datos.productos?.length || 0) ? '+' : (versionActual.datos.productos?.length || 0) < (versionAnterior.datos.productos?.length || 0) ? '' : ''}${((versionActual.datos.productos?.length || 0) - (versionAnterior.datos.productos?.length || 0))}
+                            </span>
+                        </div>
+                        <div>
+                            <strong>👥 Diferencia Personas:</strong><br>
+                            <span style="font-size: 1.2rem; font-weight: 600; color: ${(versionActual.datos.cliente?.cantidadPersonas || 0) > (versionAnterior.datos.cliente?.cantidadPersonas || 0) ? '#28a745' : (versionActual.datos.cliente?.cantidadPersonas || 0) < (versionAnterior.datos.cliente?.cantidadPersonas || 0) ? '#dc3545' : '#6c757d'};">
+                                ${(versionActual.datos.cliente?.cantidadPersonas || 0) > (versionAnterior.datos.cliente?.cantidadPersonas || 0) ? '+' : (versionActual.datos.cliente?.cantidadPersonas || 0) < (versionAnterior.datos.cliente?.cantidadPersonas || 0) ? '' : ''}${((versionActual.datos.cliente?.cantidadPersonas || 0) - (versionAnterior.datos.cliente?.cantidadPersonas || 0))}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function cerrarModalComparacion() {
+    const modal = document.getElementById('modalComparacion');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function restaurarVersion(cotizacionId, numeroVersion) {
+    if (!confirm(`¿Estás seguro de restaurar la versión ${numeroVersion}? Esto creará una nueva versión basada en los datos de la versión seleccionada.`)) {
+        return;
+    }
+    
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const index = cotizaciones.findIndex(cot => cot.id === cotizacionId);
+    
+    if (index === -1) return;
+    
+    const cotizacion = cotizaciones[index];
+    const versionARestaurar = cotizacion.versiones.find(v => v.version === numeroVersion);
+    
+    if (!versionARestaurar) return;
+    
+    // Crear nueva versión basada en la versión a restaurar
+    const siguienteVersion = Math.max(...cotizacion.versiones.map(v => v.version)) + 1;
+    const ahora = new Date();
+    const fechaHora = `${ahora.toLocaleDateString()} ${ahora.toLocaleTimeString()}`;
+    
+    const nuevaVersion = {
+        version: siguienteVersion,
+        fecha: ahora.toISOString(),
+        datos: { ...versionARestaurar.datos },
+        descripcion: `v${siguienteVersion} - ${fechaHora} (restaurada de v${numeroVersion})`
+    };
+    
+    cotizacion.versiones.push(nuevaVersion);
+    
+    // Actualizar datos principales
+    Object.assign(cotizacion, versionARestaurar.datos);
+    cotizacion.versionActual = siguienteVersion;
+    
+    localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
+    
+    mostrarHistorialVersiones(cotizacionId);
+    cargarHistorialCotizaciones();
+    
+    mostrarAlerta('alertVersiones', `Versión ${numeroVersion} restaurada como versión ${siguienteVersion}.`, 'success');
+}
+
+function crearRamaDesdeVersion(cotizacionId, numeroVersion) {
+    const descripcion = prompt(`Ingresa una descripción para la nueva rama basada en la versión ${numeroVersion}:`);
+    if (!descripcion) return;
+    
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const cotizacion = cotizaciones.find(cot => cot.id === cotizacionId);
+    
+    if (!cotizacion) return;
+    
+    const versionBase = cotizacion.versiones.find(v => v.version === numeroVersion);
+    if (!versionBase) return;
+    
+    // Crear nueva cotización basada en la versión seleccionada
+    const nuevaCotizacion = {
+        ...versionBase.datos,
+        id: Date.now(),
+        fechaCotizacion: new Date().toLocaleDateString(),
+        cliente: {
+            ...versionBase.datos.cliente,
+            nombre: versionBase.datos.cliente.nombre + ` (Rama v${numeroVersion})`
+        }
+    };
+    
+    // Cargar en el formulario para editar
+    cotizacionActual = nuevaCotizacion;
+    
+    // Cambiar al tab del cotizador
+    showTab('cotizador');
+    
+    // Mostrar el resumen
+    mostrarResumenCotizacion();
+    
+    mostrarAlerta('alertCotizacion', `Rama creada desde versión ${numeroVersion}. Puedes modificar y guardar como nueva cotización.`, 'success');
 }
 
 function descargarCotizacion() {
@@ -925,10 +2164,22 @@ function mostrarAlerta(containerId, mensaje, tipo) {
 
 // Inicializar la aplicación
 document.addEventListener('DOMContentLoaded', function() {
+    cargarCategorias();
+    cargarEstados();
     cargarProductos();
+    actualizarSelectCategorias();
+    actualizarSelectEstados();
+    actualizarListaCategorias();
+    actualizarListaEstados();
     actualizarListaProductos();
     actualizarMenuSelector();
     cargarHistorialCotizaciones();
+    
+    // Inicializar historial de versiones
+    const historialVersiones = document.getElementById('historialVersiones');
+    if (historialVersiones) {
+        historialVersiones.innerHTML = '<p style="text-align: center; color: #6c757d; font-style: italic;">Selecciona una cotización de la tabla para ver su historial de versiones.</p>';
+    }
 });
 
 // GESTIÓN DEL HISTORIAL DE COTIZACIONES
@@ -973,6 +2224,7 @@ function mostrarCotizacionesEnTabla(cotizaciones) {
                 <thead>
                     <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
                         <th style="padding: 15px; text-align: left;">Cliente</th>
+                        <th style="padding: 15px; text-align: center;">Estado</th>
                         <th style="padding: 15px; text-align: center;">Fecha Evento</th>
                         <th style="padding: 15px; text-align: center;">Personas</th>
                         <th style="padding: 15px; text-align: center;">Total</th>
@@ -986,15 +2238,24 @@ function mostrarCotizacionesEnTabla(cotizaciones) {
 
     cotizaciones.forEach((cot, index) => {
         const totalProductos = cot.productos.length;
-        const estadoClass = new Date(cot.cliente.fechaEvento) < new Date() ? 'color: #dc3545;' : 'color: #28a745;';
+        const fechaClass = new Date(cot.cliente.fechaEvento) < new Date() ? 'color: #dc3545;' : 'color: #28a745;';
+        
+        // Obtener información del estado
+        const estadoCotizacion = estadosCotizacion.find(est => est.id === cot.estado) || { nombre: 'Sin estado', icono: '❓', color: '#6c757d' };
         
         html += `
             <tr style="border-bottom: 1px solid #dee2e6; transition: background-color 0.3s ease;" 
                 onmouseover="this.style.backgroundColor='#f8f9fa'" 
                 onmouseout="this.style.backgroundColor='white'">
                 <td style="padding: 15px;">
-                    <strong style="${estadoClass}">${cot.cliente.nombre}</strong>
+                    <strong style="${fechaClass}">${cot.cliente.nombre}</strong>
                     <br><small style="color: #6c757d;">${cot.cliente.formatoEvento}</small>
+                </td>
+                <td style="padding: 15px; text-align: center;">
+                    <div style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; background: ${estadoCotizacion.color}15; color: ${estadoCotizacion.color}; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
+                        <span>${estadoCotizacion.icono}</span>
+                        <span>${estadoCotizacion.nombre}</span>
+                    </div>
                 </td>
                 <td style="padding: 15px; text-align: center;">
                     <div>${cot.cliente.fechaEvento}</div>
@@ -1017,6 +2278,7 @@ function mostrarCotizacionesEnTabla(cotizaciones) {
                     <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
                         <button class="btn" onclick="verDetalleCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">👁️ Ver</button>
                         <button class="btn btn-warning" onclick="editarCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">✏️ Editar</button>
+                        <button class="btn" onclick="mostrarHistorialVersiones(${cot.id})" style="font-size: 0.8rem; padding: 6px 10px; background: #28a745; color: white;">🔄 Versiones</button>
                         <button class="btn" onclick="duplicarCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">📋 Duplicar</button>
                         <button class="btn" onclick="descargarCotizacionIndividual(${index})" style="font-size: 0.8rem; padding: 6px 10px;">💾 Descargar</button>
                         <button class="btn btn-danger" onclick="eliminarCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">🗑️</button>
@@ -1141,6 +2403,11 @@ function editarCotizacion(index) {
         document.getElementById('cantidadPersonas').value = cot.cliente.cantidadPersonas;
         document.getElementById('formatoEvento').value = cot.cliente.formatoEvento;
         
+        // Cargar estado si existe
+        if (cot.estado && document.getElementById('estadoCotizacion')) {
+            document.getElementById('estadoCotizacion').value = cot.estado;
+        }
+        
         // Cargar fecha del evento
         if (cot.cliente.fechaEventoOriginal) {
             // Usar la fecha original en formato datetime-local
@@ -1218,12 +2485,13 @@ function editarCotizacion(index) {
         }, 200);
     }, 200);
 
-    // Eliminar la cotización original del historial
-    cotizaciones.splice(index, 1);
-    localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
-    cargarHistorialCotizaciones();
+    // Entrar en modo edición DESPUÉS de cargar todos los datos
+    entrarModoEdicion(cot);
     
-    mostrarAlerta('alertCotizacion', 'Cotización cargada para edición. Modifica los datos y vuelve a generar la cotización.', 'success');
+    // NO eliminar la cotización original, solo marcarla como en edición
+    // Se creará una nueva versión al guardar
+    
+    mostrarAlerta('alertCotizacion', 'Cotización cargada para edición. Al guardar se creará una nueva versión.', 'success');
 }
 
 function duplicarCotizacion(index) {
