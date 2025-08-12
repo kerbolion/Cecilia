@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotizador de Eventos Gastronómicos</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍽️ Cotizador de Eventos</h1>
+            <p>Gestión integral de productos y cotizaciones gastronómicas</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('productos')">📦 Productos</button>
+            <button class="tab" onclick="showTab('cotizador')">💰 Cotizador</button>
+            <button class="tab" onclick="showTab('historial')">📋 Historial</button>
+        </div>
+
+        <!-- TAB PRODUCTOS -->
+        <div id="productos" class="tab-content active">
+            <h2>Gestión de Productos</h2>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="nombreProducto">Nombre del Producto:</label>
+                    <input type="text" id="nombreProducto" placeholder="Ej: Entrada de salmón">
+                </div>
+                <div class="form-group">
+                    <label for="categoriaProducto">Categoría:</label>
+                    <select id="categoriaProducto">
+                        <option value="recepcion">Recepción</option>
+                        <option value="entrada">Entrada</option>
+                        <option value="principal">Plato Principal</option>
+                        <option value="postre">Postre</option>
+                        <option value="bebida">Bebidas</option>
+                        <option value="otros">Otros</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="costoProducto">Costo ($):</label>
+                    <input type="number" id="costoProducto" step="0.01" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label for="precioProducto">Precio Final ($):</label>
+                    <input type="number" id="precioProducto" step="0.01" placeholder="0.00">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="descripcionProducto">Descripción:</label>
+                <textarea id="descripcionProducto" rows="3" placeholder="Descripción del producto..."></textarea>
+            </div>
+
+            <button class="btn" onclick="agregarProducto()">➕ Agregar Producto</button>
+            <button class="btn btn-danger" onclick="limpiarProductos()">🗑️ Limpiar Todo</button>
+
+            <div id="alertProductos"></div>
+
+            <div id="listaProductos" class="productos-grid">
+                <!-- Los productos se cargarán aquí -->
+            </div>
+        </div>
+
+        <!-- TAB COTIZADOR -->
+        <div id="cotizador" class="tab-content">
+            <h2>Nueva Cotización</h2>
+
+            <!-- Datos del Cliente -->
+            <div class="categoria-section">
+                <h3 class="categoria-title">📋 Datos del Cliente</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombreCliente">Nombre del Cliente:</label>
+                        <input type="text" id="nombreCliente" placeholder="Nombre completo">
+                    </div>
+                    <div class="form-group">
+                        <label for="fechaEvento">Fecha del Evento:</label>
+                        <input type="datetime-local" id="fechaEvento">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="cantidadPersonas">Cantidad de Personas:</label>
+                        <input type="number" id="cantidadPersonas" min="12" max="120" placeholder="12-55 sentados / 120 parados">
+                    </div>
+                    <div class="form-group">
+                        <label for="formatoEvento">Formato:</label>
+                        <select id="formatoEvento">
+                            <option value="sentado">Sentado (máx. 55)</option>
+                            <option value="parado">Parado (máx. 120)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Motivo del Evento -->
+            <div class="categoria-section">
+                <h3 class="categoria-title">🎉 Motivo del Evento</h3>
+                <div class="checkbox-group">
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="motivo" value="cumpleanos">
+                        <label>🎂 Cumpleaños</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Celebraciones personalizadas para homenajear a quien cumple años.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="motivo" value="celebracion_especial">
+                        <label>✨ Celebración Especial</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Desde encuentros íntimos hasta fiestas sofisticadas.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="motivo" value="aniversarios">
+                        <label>💕 Aniversarios y Bodas</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Momentos románticos para celebrar el amor.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="motivo" value="reunion_familiar">
+                        <label>👨‍👩‍👧‍👦 Reuniones Familiares</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Encuentros intergeneracionales en un entorno cuidado.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="motivo" value="encuentro_amigos">
+                        <label>👥 Encuentro de Amigos</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Reunión distendida con formato relajado.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="motivo" value="corporativo">
+                        <label>🏢 Evento Corporativo</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Para fomentar integración del equipo.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="motivo" value="team_building">
+                        <label>🤝 Team Building</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Espacios de planificación y capacitación.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="motivo" value="comercial">
+                        <label>💼 Evento Comercial</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Presentación de productos o servicios.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Experiencias -->
+            <div class="categoria-section">
+                <h3 class="categoria-title">🌟 Experiencias</h3>
+                <div class="checkbox-group">
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="experiencia" value="cena_almuerzo">
+                        <label>🍽️ Cenas/Almuerzo</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Gastronomía de alta cocina con menús de pasos.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="experiencia" value="cena_maridada">
+                        <label>🍷 Cenas Maridadas por Pasos</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Cada plato armonizado con vinos seleccionados.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="experiencia" value="cata_vinos">
+                        <label>🍾 Cata de Vinos</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Degustación guiada de etiquetas seleccionadas.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="experiencia" value="finger_food">
+                        <label>🥂 Finger Food & Lounge</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Formato relajado para socializar con bocados gourmet.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="experiencia" value="after_office">
+                        <label>🌆 After Office</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Veladas con vinos boutique y DJ en vivo.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="experiencia" value="cocteles">
+                        <label>🍸 Cócteles de Autor</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Barra abierta con cócteles preparados por bartenders.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="experiencia" value="show_cooking">
+                        <label>👨‍🍳 Show Cooking</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Chef cocina en vivo frente a los invitados.</p>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                        <input type="checkbox" name="experiencia" value="brunch">
+                        <label>🥞 Brunch</label>
+                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Fusión perfecta entre desayuno y almuerzo.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selección de Menú -->
+            <div class="categoria-section">
+                <h3 class="categoria-title">🍴 Selección de Menú</h3>
+                <div id="menuSelector">
+                    <!-- Se cargará dinámicamente según los productos -->
+                </div>
+            </div>
+
+            <button class="btn btn-success" onclick="generarCotizacion()">📊 Generar Cotización</button>
+            <button class="btn" onclick="limpiarCotizacion()">🔄 Limpiar Formulario</button>
+
+            <div id="alertCotizacion"></div>
+
+            <!-- Resumen de Cotización -->
+            <div id="resumenCotizacion" style="display: none;">
+                <!-- Se generará dinámicamente -->
+            </div>
+        </div>
+
+        <!-- TAB HISTORIAL -->
+        <div id="historial" class="tab-content">
+            <h2>Historial de Cotizaciones</h2>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="buscarCotizacion" placeholder="Buscar por cliente..." style="width: 250px;">
+                    <button class="btn" onclick="buscarCotizaciones()">🔍 Buscar</button>
+                    <button class="btn" onclick="mostrarTodasCotizaciones()">📋 Mostrar Todas</button>
+                </div>
+                <div>
+                    <button class="btn btn-success" onclick="exportarCotizaciones()">📤 Exportar Todo</button>
+                    <button class="btn btn-danger" onclick="limpiarHistorial()">🗑️ Limpiar Historial</button>
+                </div>
+            </div>
+
+            <div id="alertHistorial"></div>
+
+            <div id="tablaCotizaciones">
+                <!-- Se cargará dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
