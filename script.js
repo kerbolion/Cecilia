@@ -47,9 +47,17 @@ let motivosEvento = [
 ];
 let motivoEnEdicion = null;
 
+// Variables para campos personalizados del cliente
+let camposPersonalizados = [];
+let campoEnEdicion = null;
+
 let cotizacionSeleccionada = null; // Para el manejo de versiones
 let editandoCotizacion = false; // Para saber si estamos editando una cotización existente
 let cotizacionOriginalEnEdicion = null; // Para mantener referencia a la cotización original
+
+// Variables para vista de presentación
+let vistaPresentacion = false;
+let ocultarPrecios = false;
 
 // Función para crear una copia profunda de objetos
 function copiarProfundo(obj) {
@@ -72,6 +80,354 @@ function copiarProfundo(obj) {
         });
         return copy;
     }
+}
+
+// GESTIÓN DE CAMPOS PERSONALIZADOS DEL CLIENTE
+function cargarCamposPersonalizados() {
+    const camposGuardados = JSON.parse(localStorage.getItem('camposPersonalizados') || '[]');
+    camposPersonalizados = camposGuardados;
+}
+
+function guardarCamposPersonalizados() {
+    localStorage.setItem('camposPersonalizados', JSON.stringify(camposPersonalizados));
+}
+
+function agregarCampoPersonalizado() {
+    if (campoEnEdicion) {
+        actualizarCampoPersonalizado();
+        return;
+    }
+
+    const nombre = document.getElementById('nombreCampo').value.trim();
+    const tipo = document.getElementById('tipoCampo').value;
+    const placeholder = document.getElementById('placeholderCampo').value.trim();
+    const requerido = document.getElementById('requeridoCampo').value === 'true';
+    const opciones = document.getElementById('opcionesDesplegable').value.trim();
+
+    if (!nombre) {
+        mostrarAlerta('alertCamposPersonalizados', 'Por favor ingresa el nombre del campo.', 'error');
+        return;
+    }
+
+    if (camposPersonalizados.some(campo => campo.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertCamposPersonalizados', 'Ya existe un campo con ese nombre.', 'error');
+        return;
+    }
+
+    if (tipo === 'desplegable' && !opciones) {
+        mostrarAlerta('alertCamposPersonalizados', 'Para campos desplegables debes agregar al menos una opción.', 'error');
+        return;
+    }
+
+    const siguienteOrden = Math.max(...camposPersonalizados.map(c => c.orden || 0)) + 1;
+    
+    const campo = {
+        id: nombre.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+        nombre,
+        tipo,
+        placeholder,
+        requerido,
+        opciones: tipo === 'desplegable' ? opciones.split('\n').filter(o => o.trim()) : [],
+        orden: siguienteOrden
+    };
+
+    camposPersonalizados.push(campo);
+    guardarCamposPersonalizados();
+    actualizarListaCamposPersonalizados();
+    generarCamposPersonalizadosEnCotizador();
+    actualizarVariablesCamposPersonalizados();
+    limpiarFormularioCampo();
+    mostrarAlerta('alertCamposPersonalizados', 'Campo personalizado agregado exitosamente.', 'success');
+}
+
+function actualizarCampoPersonalizado() {
+    const nombre = document.getElementById('nombreCampo').value.trim();
+    const tipo = document.getElementById('tipoCampo').value;
+    const placeholder = document.getElementById('placeholderCampo').value.trim();
+    const requerido = document.getElementById('requeridoCampo').value === 'true';
+    const opciones = document.getElementById('opcionesDesplegable').value.trim();
+
+    if (!nombre) {
+        mostrarAlerta('alertCamposPersonalizados', 'Por favor ingresa el nombre del campo.', 'error');
+        return;
+    }
+
+    if (camposPersonalizados.some(campo => campo.id !== campoEnEdicion.id && campo.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertCamposPersonalizados', 'Ya existe un campo con ese nombre.', 'error');
+        return;
+    }
+
+    if (tipo === 'desplegable' && !opciones) {
+        mostrarAlerta('alertCamposPersonalizados', 'Para campos desplegables debes agregar al menos una opción.', 'error');
+        return;
+    }
+
+    const index = camposPersonalizados.findIndex(campo => campo.id === campoEnEdicion.id);
+    if (index !== -1) {
+        camposPersonalizados[index] = {
+            ...campoEnEdicion,
+            nombre,
+            tipo,
+            placeholder,
+            requerido,
+            opciones: tipo === 'desplegable' ? opciones.split('\n').filter(o => o.trim()) : []
+        };
+        
+        guardarCamposPersonalizados();
+        actualizarListaCamposPersonalizados();
+        generarCamposPersonalizadosEnCotizador();
+        actualizarVariablesCamposPersonalizados();
+        limpiarFormularioCampo();
+        campoEnEdicion = null;
+        actualizarBotonCampo();
+        mostrarAlerta('alertCamposPersonalizados', 'Campo personalizado actualizado exitosamente.', 'success');
+    }
+}
+
+function editarCampoPersonalizado(id) {
+    const campo = camposPersonalizados.find(c => c.id === id);
+    if (campo) {
+        campoEnEdicion = { ...campo };
+        
+        document.getElementById('nombreCampo').value = campo.nombre;
+        document.getElementById('tipoCampo').value = campo.tipo;
+        document.getElementById('placeholderCampo').value = campo.placeholder;
+        document.getElementById('requeridoCampo').value = campo.requerido.toString();
+        
+        // Mostrar/ocultar opciones según el tipo
+        toggleOpcionesDesplegable();
+        
+        if (campo.tipo === 'desplegable') {
+            document.getElementById('opcionesDesplegable').value = campo.opciones.join('\n');
+        }
+        
+        actualizarBotonCampo();
+        document.getElementById('nombreCampo').focus();
+        mostrarAlerta('alertCamposPersonalizados', 'Campo cargado para edición.', 'success');
+    }
+}
+
+function eliminarCampoPersonalizado(id) {
+    if (confirm('¿Estás seguro de eliminar este campo personalizado?')) {
+        camposPersonalizados = camposPersonalizados.filter(campo => campo.id !== id);
+        guardarCamposPersonalizados();
+        actualizarListaCamposPersonalizados();
+        generarCamposPersonalizadosEnCotizador();
+        actualizarVariablesCamposPersonalizados();
+        mostrarAlerta('alertCamposPersonalizados', 'Campo personalizado eliminado exitosamente.', 'success');
+    }
+}
+
+function limpiarFormularioCampo() {
+    document.getElementById('nombreCampo').value = '';
+    document.getElementById('tipoCampo').value = 'texto';
+    document.getElementById('placeholderCampo').value = '';
+    document.getElementById('requeridoCampo').value = 'false';
+    document.getElementById('opcionesDesplegable').value = '';
+    toggleOpcionesDesplegable();
+    campoEnEdicion = null;
+    actualizarBotonCampo();
+}
+
+function cancelarEdicionCampo() {
+    limpiarFormularioCampo();
+    mostrarAlerta('alertCamposPersonalizados', 'Edición de campo cancelada.', 'success');
+}
+
+function actualizarBotonCampo() {
+    const boton = document.querySelector('button[onclick="agregarCampoPersonalizado()"]');
+    if (boton) {
+        if (campoEnEdicion) {
+            boton.innerHTML = '✏️ Actualizar';
+            boton.style.background = '#f39c12';
+            
+            if (!document.getElementById('cancelarEdicionCampoBtn')) {
+                const cancelarBtn = document.createElement('button');
+                cancelarBtn.id = 'cancelarEdicionCampoBtn';
+                cancelarBtn.className = 'btn';
+                cancelarBtn.innerHTML = '❌ Cancelar';
+                cancelarBtn.onclick = cancelarEdicionCampo;
+                cancelarBtn.style.background = '#95a5a6';
+                boton.parentNode.insertBefore(cancelarBtn, boton.nextSibling);
+            }
+        } else {
+            boton.innerHTML = '➕ Agregar Campo';
+            boton.style.background = '#17a2b8';
+            
+            const cancelarBtn = document.getElementById('cancelarEdicionCampoBtn');
+            if (cancelarBtn) {
+                cancelarBtn.remove();
+            }
+        }
+    }
+}
+
+function toggleOpcionesDesplegable() {
+    const tipo = document.getElementById('tipoCampo').value;
+    const container = document.getElementById('opcionesDesplegableContainer');
+    
+    if (tipo === 'desplegable') {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+function actualizarListaCamposPersonalizados() {
+    const container = document.getElementById('listaCamposPersonalizados');
+    
+    if (camposPersonalizados.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #6c757d; font-style: italic;">No hay campos personalizados configurados.</p>';
+        return;
+    }
+
+    const camposOrdenados = camposPersonalizados.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">';
+    
+    camposOrdenados.forEach(campo => {
+        const tipoIcono = {
+            'texto': '📝',
+            'numero': '🔢',
+            'fecha': '📅',
+            'hora': '🕐',
+            'checkbox': '☑️',
+            'desplegable': '📋'
+        };
+        
+        let detallesCampo = '';
+        if (campo.tipo === 'desplegable' && campo.opciones && campo.opciones.length > 0) {
+            detallesCampo = `<br><small style="color: #6c757d;">Opciones: ${campo.opciones.join(', ')}</small>`;
+        }
+        
+        html += `
+            <div style="background: white; padding: 15px; border-radius: 10px; border: 1px solid #dee2e6; border-left: 4px solid #17a2b8;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">${tipoIcono[campo.tipo] || '📝'}</span>
+                        <strong style="color: #17a2b8;">${campo.nombre}</strong>
+                        ${campo.requerido ? '<span style="color: #dc3545; font-size: 0.8rem;">*</span>' : ''}
+                    </div>
+                </div>
+                <p style="color: #6c757d; margin-bottom: 15px; font-size: 0.9rem;">
+                    <strong>Tipo:</strong> ${campo.tipo}
+                    ${campo.placeholder ? `<br><strong>Placeholder:</strong> ${campo.placeholder}` : ''}
+                    ${detallesCampo}
+                    <br><strong>Variable:</strong> <code>[${campo.id}]</code>
+                </p>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn" onclick="editarCampoPersonalizado('${campo.id}')" style="font-size: 0.8rem; padding: 6px 10px; background: #f39c12; color: white; flex: 1;">✏️ Editar</button>
+                    <button class="btn btn-danger" onclick="eliminarCampoPersonalizado('${campo.id}')" style="font-size: 0.8rem; padding: 6px 10px; flex: 1;">🗑️</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function generarCamposPersonalizadosEnCotizador() {
+    const container = document.getElementById('camposPersonalizados');
+    
+    if (camposPersonalizados.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const camposOrdenados = camposPersonalizados.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    
+    let html = '<div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px;"><h5 style="color: #1976d2; margin-bottom: 15px;">📋 Campos Adicionales</h5>';
+    
+    // Generar campos en filas de 2
+    for (let i = 0; i < camposOrdenados.length; i += 2) {
+        html += '<div class="form-row">';
+        
+        for (let j = i; j < Math.min(i + 2, camposOrdenados.length); j++) {
+            const campo = camposOrdenados[j];
+            html += '<div class="form-group">';
+            html += `<label for="campo_${campo.id}">${campo.nombre}${campo.requerido ? ' *' : ''}:</label>`;
+            
+            switch (campo.tipo) {
+                case 'texto':
+                    html += `<input type="text" id="campo_${campo.id}" placeholder="${campo.placeholder}" ${campo.requerido ? 'required' : ''} oninput="actualizarResumenTiempoReal()">`;
+                    break;
+                case 'numero':
+                    html += `<input type="number" id="campo_${campo.id}" placeholder="${campo.placeholder}" ${campo.requerido ? 'required' : ''} oninput="actualizarResumenTiempoReal()">`;
+                    break;
+                case 'fecha':
+                    html += `<input type="date" id="campo_${campo.id}" ${campo.requerido ? 'required' : ''} onchange="actualizarResumenTiempoReal()">`;
+                    break;
+                case 'hora':
+                    html += `<input type="time" id="campo_${campo.id}" ${campo.requerido ? 'required' : ''} onchange="actualizarResumenTiempoReal()">`;
+                    break;
+                case 'checkbox':
+                    html += `<div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;"><input type="checkbox" id="campo_${campo.id}" onchange="actualizarResumenTiempoReal()"><label for="campo_${campo.id}">${campo.placeholder || 'Activar'}</label></div>`;
+                    break;
+                case 'desplegable':
+                    html += `<select id="campo_${campo.id}" ${campo.requerido ? 'required' : ''} onchange="actualizarResumenTiempoReal()">`;
+                    html += `<option value="">${campo.placeholder || 'Seleccionar...'}</option>`;
+                    campo.opciones.forEach(opcion => {
+                        html += `<option value="${opcion}">${opcion}</option>`;
+                    });
+                    html += '</select>';
+                    break;
+            }
+            
+            html += '</div>';
+        }
+        
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function actualizarVariablesCamposPersonalizados() {
+    const container = document.getElementById('variablesCamposPersonalizados');
+    
+    if (camposPersonalizados.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = '<strong>Variables de campos personalizados:</strong><br>';
+    camposPersonalizados.forEach(campo => {
+        html += `<code>[${campo.id}]</code> - ${campo.nombre}<br>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+function obtenerValoresCamposPersonalizados() {
+    const valores = {};
+    
+    camposPersonalizados.forEach(campo => {
+        const elemento = document.getElementById(`campo_${campo.id}`);
+        if (elemento) {
+            if (campo.tipo === 'checkbox') {
+                valores[campo.id] = elemento.checked ? 'Sí' : 'No';
+            } else {
+                valores[campo.id] = elemento.value || '';
+            }
+        }
+    });
+    
+    return valores;
+}
+
+function cargarValoresCamposPersonalizados(valores) {
+    camposPersonalizados.forEach(campo => {
+        const elemento = document.getElementById(`campo_${campo.id}`);
+        if (elemento && valores && valores[campo.id] !== undefined) {
+            if (campo.tipo === 'checkbox') {
+                elemento.checked = valores[campo.id] === 'Sí' || valores[campo.id] === true;
+            } else {
+                elemento.value = valores[campo.id];
+            }
+        }
+    });
 }
 
 // GESTIÓN DE EXPERIENCIAS
@@ -515,14 +871,24 @@ function restaurarPlantillaDefecto() {
 }
 
 function obtenerPlantillaDefecto() {
-    return `COTIZACIÓN DE EVENTO GASTRONÓMICO
+    let plantilla = `COTIZACIÓN DE EVENTO GASTRONÓMICO
 ===============================
 
 Cliente: [cliente]
 Fecha del Evento: [fecha_evento]
 Hora: [hora_evento]
 Cantidad de Personas: [personas] ([formato])
-Estado: [estado]
+Estado: [estado]`;
+
+    // Agregar campos personalizados a la plantilla por defecto
+    if (camposPersonalizados.length > 0) {
+        plantilla += '\n\nDATOS ADICIONALES:\n';
+        camposPersonalizados.forEach(campo => {
+            plantilla += `${campo.nombre}: [${campo.id}]\n`;
+        });
+    }
+
+    plantilla += `
 
 [motivos]
 
@@ -543,6 +909,8 @@ Cotización generada el: [fecha_cotizacion]
 POLÍTICAS:
 ==========
 [politicas]`;
+
+    return plantilla;
 }
 
 function previsualizarPlantilla() {
@@ -631,7 +999,7 @@ function procesarPlantilla(plantilla, cotizacion) {
     
     let contenido = plantilla;
     
-    // Reemplazar variables
+    // Reemplazar variables básicas
     contenido = contenido.replace(/\[cliente\]/g, cotizacion.cliente?.nombre || '');
     contenido = contenido.replace(/\[fecha_evento\]/g, cotizacion.cliente?.fechaEvento || '');
     contenido = contenido.replace(/\[hora_evento\]/g, cotizacion.cliente?.horaEvento || '');
@@ -648,7 +1016,77 @@ function procesarPlantilla(plantilla, cotizacion) {
     contenido = contenido.replace(/\[fecha_cotizacion\]/g, cotizacion.fechaCotizacion || '');
     contenido = contenido.replace(/\[politicas\]/g, politicas);
     
+    // Reemplazar variables de campos personalizados
+    if (cotizacion.camposPersonalizados) {
+        camposPersonalizados.forEach(campo => {
+            const valor = cotizacion.camposPersonalizados[campo.id] || '';
+            const regex = new RegExp(`\\[${campo.id}\\]`, 'g');
+            contenido = contenido.replace(regex, valor);
+        });
+    }
+    
     return contenido;
+}
+
+// FUNCIONES DE VISTA DE PRESENTACIÓN
+function toggleVistaPresentacion() {
+    vistaPresentacion = !vistaPresentacion;
+    const resumen = document.getElementById('resumenCotizacion');
+    
+    if (vistaPresentacion) {
+        resumen.classList.add('vista-presentacion');
+        document.querySelector('button[onclick="toggleVistaPresentacion()"]').innerHTML = '📋 Vista Normal';
+    } else {
+        resumen.classList.remove('vista-presentacion');
+        document.querySelector('button[onclick="toggleVistaPresentacion()"]').innerHTML = '📋 Vista Presentación';
+    }
+}
+
+function toggleOcultarPrecios() {
+    ocultarPrecios = !ocultarPrecios;
+    const boton = document.querySelector('button[onclick="toggleOcultarPrecios()"]');
+    
+    if (ocultarPrecios) {
+        boton.innerHTML = '💰 Mostrar Precios';
+        boton.style.background = '#28a745';
+    } else {
+        boton.innerHTML = '🙈 Ocultar Precios';
+        boton.style.background = '#6c757d';
+    }
+    
+    actualizarResumenTiempoReal();
+}
+
+function imprimirResumen() {
+    // Ocultar elementos que no se deben imprimir
+    document.querySelectorAll('.no-print').forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Mostrar solo el resumen
+    const resumen = document.getElementById('resumenCotizacion');
+    if (resumen) {
+        resumen.style.display = 'block';
+        
+        // Aplicar estilo de vista presentación para impresión
+        if (!vistaPresentacion) {
+            resumen.classList.add('vista-presentacion');
+        }
+        
+        // Imprimir
+        window.print();
+        
+        // Restaurar vista después de imprimir
+        setTimeout(() => {
+            document.querySelectorAll('.no-print').forEach(el => {
+                el.style.display = '';
+            });
+            
+            if (!vistaPresentacion) {
+                resumen.classList.remove('vista-presentacion');
+            }
+        }, 1000);
+    }
 }
 
 // Función para actualizar el resumen en tiempo real
@@ -672,6 +1110,9 @@ function actualizarResumenTiempoReal() {
     // Recopilar experiencias seleccionadas
     const experienciasSeleccionadas = Array.from(document.querySelectorAll('input[name="experiencia"]:checked')).map(cb => cb.value);
 
+    // Recopilar valores de campos personalizados
+    const valoresCamposPersonalizados = obtenerValoresCamposPersonalizados();
+
     // Recopilar productos del menú seleccionados
     const productosSeleccionados = [];
     
@@ -694,7 +1135,7 @@ function actualizarResumenTiempoReal() {
 
     // Si no hay productos, mostrar mensaje pero mantener estructura
     if (productosSeleccionados.length === 0) {
-        mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, formatoEvento, estadoSeleccionado, motivosSeleccionados, experienciasSeleccionadas);
+        mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, formatoEvento, estadoSeleccionado, motivosSeleccionados, experienciasSeleccionadas, valoresCamposPersonalizados);
         return;
     }
 
@@ -727,6 +1168,7 @@ function actualizarResumenTiempoReal() {
         motivos: motivosSeleccionados,
         experiencias: experienciasSeleccionadas,
         productos: productosSeleccionados,
+        camposPersonalizados: valoresCamposPersonalizados,
         totales: {
             subtotal: subtotalProductos,
             costoTotal,
@@ -738,7 +1180,7 @@ function actualizarResumenTiempoReal() {
     mostrarResumenCotizacion();
 }
 
-function mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, formatoEvento, estadoSeleccionado, motivosSeleccionados, experienciasSeleccionadas) {
+function mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, formatoEvento, estadoSeleccionado, motivosSeleccionados, experienciasSeleccionadas, valoresCamposPersonalizados) {
     const container = document.getElementById('resumenCotizacion');
     const estadoCotizacion = estadosCotizacion.find(est => est.id === estadoSeleccionado) || estadosCotizacion[0];
 
@@ -752,6 +1194,32 @@ function mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, forma
         const experiencia = experiencias.find(e => e.id === id);
         return experiencia ? `${experiencia.icono} ${experiencia.nombre}` : id;
     });
+
+    // Generar campos personalizados para mostrar
+    let camposPersonalizadosHtml = '';
+    if (camposPersonalizados.length > 0 && Object.keys(valoresCamposPersonalizados).some(key => valoresCamposPersonalizados[key])) {
+        camposPersonalizadosHtml = `
+            <div style="margin-bottom: 20px;">
+                <h4 style="color: #2c3e50; margin-bottom: 10px;">📋 Información Adicional:</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    ${camposPersonalizados.map(campo => {
+                        const valor = valoresCamposPersonalizados[campo.id];
+                        if (valor) {
+                            return `
+                                <div style="background: white; padding: 10px; border-radius: 8px; border-left: 3px solid #17a2b8;">
+                                    <div style="font-size: 0.9rem; color: #6c757d;">${campo.nombre}</div>
+                                    <div style="font-weight: 600; color: #2c3e50;">${valor}</div>
+                                </div>
+                            `;
+                        }
+                        return '';
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    const politicas = localStorage.getItem('politicas') || '';
 
     let html = `
         <div class="cotizacion-resumen">
@@ -783,6 +1251,8 @@ function mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, forma
                 </div>
             </div>
 
+            ${camposPersonalizadosHtml}
+
             ${motivosSeleccionados.length > 0 ? `
                 <div style="margin-bottom: 20px;">
                     <h4 style="color: #2c3e50; margin-bottom: 10px;">Motivo del Evento:</h4>
@@ -807,7 +1277,16 @@ function mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, forma
                 <p style="color: #6c757d;">Selecciona productos del menú para ver el detalle y total de la cotización</p>
             </div>
 
-            <div style="text-align: center; margin-top: 20px;">
+            ${politicas ? `
+                <div class="politicas-section">
+                    <h4 style="color: #2c3e50; margin-bottom: 15px;">📋 Políticas de la Empresa</h4>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #dc3545;">
+                        ${politicas}
+                    </div>
+                </div>
+            ` : ''}
+
+            <div class="no-print" style="text-align: center; margin-top: 20px;">
                 <button class="btn" onclick="descargarCotizacion()" disabled style="opacity: 0.5;">📄 Descargar TXT</button>
                 <button class="btn" onclick="guardarCotizacion()" disabled style="opacity: 0.5;">💾 Guardar Cotización</button>
                 <div style="margin-top: 10px; font-size: 0.9rem; color: #6c757d;">Agrega productos para habilitar las acciones</div>
@@ -1690,7 +2169,7 @@ function actualizarMenuSelector() {
                                 <div style="display: flex; align-items: center;">
                                     <input type="checkbox" id="producto_${p.id}" value="${p.id}" style="margin-right: 10px; transform: scale(1.2);" onchange="toggleProducto(${p.id})">
                                     <label for="producto_${p.id}" style="cursor: pointer; margin: 0;">
-                                        <strong>${p.nombre}</strong> - $${p.precio.toFixed(2)}
+                                        <strong>${p.nombre}</strong> ${ocultarPrecios ? '' : `- $${p.precio.toFixed(2)}`}
                                         ${p.descripcion ? `<br><small style="color: #6c757d;">${p.descripcion}</small>` : ''}
                                     </label>
                                 </div>
@@ -1702,7 +2181,7 @@ function actualizarMenuSelector() {
                                 </div>
                                 <div style="text-align: right; min-width: 100px;">
                                     <div style="font-size: 0.9rem; color: #6c757d;">Subtotal:</div>
-                                    <div id="subtotal_${p.id}" style="font-weight: 600; color: #28a745;">$0.00</div>
+                                    <div id="subtotal_${p.id}" style="font-weight: 600; color: #28a745;">${ocultarPrecios ? 'Oculto' : '$0.00'}</div>
                                 </div>
                             </div>
                         `).join('')}
@@ -1867,7 +2346,7 @@ function toggleProducto(productoId) {
     } else {
         cantidadInput.disabled = true;
         cantidadInput.value = 1;
-        subtotalDiv.textContent = '$0.00';
+        subtotalDiv.textContent = ocultarPrecios ? 'Oculto' : '$0.00';
         
         // Actualizar máximos de la categoría después de deseleccionar
         const producto = productos.find(p => p.id === productoId);
@@ -1892,7 +2371,7 @@ function calcularTotalProducto(productoId) {
         const cantidad = parseInt(cantidadInput.value) || 1;
         
         const subtotal = producto.precio * cantidad;
-        subtotalDiv.textContent = `$${subtotal.toFixed(2)}`;
+        subtotalDiv.textContent = ocultarPrecios ? 'Oculto' : `$${subtotal.toFixed(2)}`;
         
         // Actualizar máximos de toda la categoría
         actualizarMaximosCategoria(producto.categoria);
@@ -2016,6 +2495,32 @@ function mostrarResumenCotizacion() {
     // Obtener información del estado
     const estadoCotizacion = estadosCotizacion.find(est => est.id === cot.estado) || estadosCotizacion[0];
 
+    // Generar campos personalizados para mostrar
+    let camposPersonalizadosHtml = '';
+    if (camposPersonalizados.length > 0 && cot.camposPersonalizados && Object.keys(cot.camposPersonalizados).some(key => cot.camposPersonalizados[key])) {
+        camposPersonalizadosHtml = `
+            <div style="margin-bottom: 20px;">
+                <h4 style="color: #2c3e50; margin-bottom: 10px;">📋 Información Adicional:</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    ${camposPersonalizados.map(campo => {
+                        const valor = cot.camposPersonalizados[campo.id];
+                        if (valor) {
+                            return `
+                                <div style="background: white; padding: 10px; border-radius: 8px; border-left: 3px solid #17a2b8;">
+                                    <div style="font-size: 0.9rem; color: #6c757d;">${campo.nombre}</div>
+                                    <div style="font-weight: 600; color: #2c3e50;">${valor}</div>
+                                </div>
+                            `;
+                        }
+                        return '';
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    const politicas = localStorage.getItem('politicas') || '';
+
     let html = `
         <div class="cotizacion-resumen">
             <h3 style="color: #667eea; margin-bottom: 20px; text-align: center;">📊 Resumen de Cotización</h3>
@@ -2045,6 +2550,8 @@ function mostrarResumenCotizacion() {
                     <div class="info-value">${cot.cliente.cantidadPersonas} (${cot.cliente.formatoEvento})</div>
                 </div>
             </div>
+
+            ${camposPersonalizadosHtml}
 
             ${cot.motivos.length > 0 ? `
                 <div style="margin-bottom: 20px;">
@@ -2080,15 +2587,15 @@ function mostrarResumenCotizacion() {
                             tablaHtml += `
                                 <div style="margin-bottom: 25px;">
                                     <h5 style="color: #667eea; margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
-                                        ${categoria.icono} ${categoria.nombre} - Subtotal: $${subtotalCategoria.toFixed(2)}
+                                        ${categoria.icono} ${categoria.nombre} ${ocultarPrecios ? '' : `- Subtotal: $${subtotalCategoria.toFixed(2)}`}
                                     </h5>
                                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                                         <thead>
                                             <tr style="background: #f8f9fa;">
                                                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Producto</th>
-                                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Precio Unit.</th>
+                                                ${ocultarPrecios ? '' : '<th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Precio Unit.</th>'}
                                                 <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Cantidad</th>
-                                                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Subtotal</th>
+                                                ${ocultarPrecios ? '' : '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Subtotal</th>'}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -2098,9 +2605,9 @@ function mostrarResumenCotizacion() {
                                                         <strong>${p.nombre}</strong>
                                                         ${p.descripcion ? `<br><small style="color: #6c757d;">${p.descripcion}</small>` : ''}
                                                     </td>
-                                                    <td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">$${p.precio.toFixed(2)}</td>
+                                                    ${ocultarPrecios ? '' : `<td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">$${p.precio.toFixed(2)}</td>`}
                                                     <td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">${p.cantidad}</td>
-                                                    <td style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6; font-weight: 600;">$${p.subtotal.toFixed(2)}</td>
+                                                    ${ocultarPrecios ? '' : `<td style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6; font-weight: 600;">$${p.subtotal.toFixed(2)}</td>`}
                                                 </tr>
                                             `).join('')}
                                         </tbody>
@@ -2114,24 +2621,38 @@ function mostrarResumenCotizacion() {
                 })()}
             </div>
 
-            <div class="total-section">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;">
-                    <div>
-                        <div style="font-size: 0.9rem; opacity: 0.8;">Costo Total</div>
-                        <div style="font-size: 1.5rem; font-weight: 600;">$${cot.totales.costoTotal.toFixed(2)}</div>
+            ${!ocultarPrecios ? `
+                <div class="total-section">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <div style="font-size: 0.9rem; opacity: 0.8;">Costo Total</div>
+                            <div style="font-size: 1.5rem; font-weight: 600;">$${cot.totales.costoTotal.toFixed(2)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; opacity: 0.8;">Margen</div>
+                            <div style="font-size: 1.5rem; font-weight: 600;">$${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)</div>
+                        </div>
                     </div>
-                    <div>
-                        <div style="font-size: 0.9rem; opacity: 0.8;">Margen</div>
-                        <div style="font-size: 1.5rem; font-weight: 600;">$${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)</div>
+                    <div class="total-amount">$${cot.totales.subtotal.toFixed(2)}</div>
+                    <div style="font-size: 1.1rem;">Total de la Cotización</div>
+                </div>
+            ` : ''}
+
+            ${politicas ? `
+                <div class="politicas-section">
+                    <h4 style="color: #2c3e50; margin-bottom: 15px;">📋 Políticas de la Empresa</h4>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #dc3545;">
+                        ${politicas}
                     </div>
                 </div>
-                <div class="total-amount">$${cot.totales.subtotal.toFixed(2)}</div>
-                <div style="font-size: 1.1rem;">Total de la Cotización</div>
-            </div>
+            ` : ''}
 
-            <div style="text-align: center; margin-top: 20px;">
+            <div class="no-print" style="text-align: center; margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
                 <button class="btn" onclick="descargarCotizacion()">📄 Descargar TXT</button>
                 <button class="btn" onclick="guardarCotizacion()">💾 Guardar Cotización</button>
+                <button class="btn" onclick="toggleVistaPresentacion()" style="background: #17a2b8; color: white;">📋 Vista Presentación</button>
+                <button class="btn" onclick="toggleOcultarPrecios()" style="background: #6c757d; color: white;">🙈 Ocultar Precios</button>
+                <button class="btn" onclick="imprimirResumen()" style="background: #28a745; color: white;">🖨️ Imprimir</button>
             </div>
         </div>
     `;
@@ -2156,6 +2677,18 @@ function limpiarCotizacion(sinConfirmacion = false) {
         document.getElementById('estadoCotizacion').value = estadosOrdenados[0].id;
     }
 
+    // Limpiar campos personalizados
+    camposPersonalizados.forEach(campo => {
+        const elemento = document.getElementById(`campo_${campo.id}`);
+        if (elemento) {
+            if (campo.tipo === 'checkbox') {
+                elemento.checked = false;
+            } else {
+                elemento.value = '';
+            }
+        }
+    });
+
     // Limpiar checkboxes
     document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
         cb.checked = false;
@@ -2175,7 +2708,7 @@ function limpiarCotizacion(sinConfirmacion = false) {
             cantidadInput.max = '';
         }
         if (subtotalDiv) {
-            subtotalDiv.textContent = '$0.00';
+            subtotalDiv.textContent = ocultarPrecios ? 'Oculto' : '$0.00';
         }
     });
 
@@ -2192,6 +2725,10 @@ function limpiarCotizacion(sinConfirmacion = false) {
     if (editandoCotizacion) {
         salirModoEdicion();
     }
+    
+    // Resetear vistas
+    vistaPresentacion = false;
+    ocultarPrecios = false;
     
     if (!sinConfirmacion) {
         mostrarAlerta('alertCotizacion', 'Formulario limpiado.', 'success');
@@ -2268,7 +2805,8 @@ function agregarEventosActualizacion() {
     document.getElementById('formatoEvento').addEventListener('change', actualizarResumenTiempoReal);
     document.getElementById('estadoCotizacion').addEventListener('change', actualizarResumenTiempoReal);
     
-    // Eventos para checkboxes (se manejan en toggleCheckbox)
+    // Evento para el tipo de campo personalizado
+    document.getElementById('tipoCampo').addEventListener('change', toggleOpcionesDesplegable);
     
     // Nota: Los eventos de productos se manejan directamente en las funciones toggleProducto y calcularTotalProducto
 }
@@ -2411,6 +2949,7 @@ document.addEventListener('DOMContentLoaded', function() {
     cargarEstados();
     cargarExperiencias();
     cargarMotivos();
+    cargarCamposPersonalizados();
     cargarPoliticas();
     cargarPlantilla();
     cargarProductos();
@@ -2420,10 +2959,13 @@ document.addEventListener('DOMContentLoaded', function() {
     actualizarListaEstados();
     actualizarListaExperiencias();
     actualizarListaMotivos();
+    actualizarListaCamposPersonalizados();
     actualizarListaProductos();
     actualizarMenuSelector();
     actualizarExperienciasCheckboxes();
     actualizarMotivosCheckboxes();
+    generarCamposPersonalizadosEnCotizador();
+    actualizarVariablesCamposPersonalizados();
     cargarHistorialCotizaciones();
     
     // Agregar eventos para actualización en tiempo real
@@ -2686,6 +3228,11 @@ function editarCotizacion(index) {
             }
         }
 
+        // Cargar campos personalizados
+        if (cot.camposPersonalizados) {
+            cargarValoresCamposPersonalizados(cot.camposPersonalizados);
+        }
+
         // Limpiar selecciones previas
         document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
             cb.checked = false;
@@ -2850,6 +3397,7 @@ function exportarBaseDatos() {
     const estadosCotizacion = JSON.parse(localStorage.getItem('estadosCotizacion') || '[]');
     const experiencias = JSON.parse(localStorage.getItem('experiencias') || '[]');
     const motivosEvento = JSON.parse(localStorage.getItem('motivosEvento') || '[]');
+    const camposPersonalizados = JSON.parse(localStorage.getItem('camposPersonalizados') || '[]');
     const politicas = localStorage.getItem('politicas') || '';
     const plantillaDescarga = localStorage.getItem('plantillaDescarga') || '';
     
@@ -2860,10 +3408,11 @@ function exportarBaseDatos() {
         estadosCotizacion: estadosCotizacion,
         experiencias: experiencias,
         motivosEvento: motivosEvento,
+        camposPersonalizados: camposPersonalizados,
         politicas: politicas,
         plantillaDescarga: plantillaDescarga,
         fechaExportacion: new Date().toISOString(),
-        version: '3.0'
+        version: '4.0'
     };
     
     const contenidoJSON = JSON.stringify(baseDatos, null, 2);
@@ -2878,7 +3427,7 @@ function exportarBaseDatos() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    mostrarAlerta('alertHistorial', `Base de datos exportada: ${productos.length} productos, ${cotizaciones.length} cotizaciones, ${categorias.length} categorías, ${estadosCotizacion.length} estados, ${experiencias.length} experiencias y ${motivosEvento.length} motivos.`, 'success');
+    mostrarAlerta('alertHistorial', `Base de datos exportada: ${productos.length} productos, ${cotizaciones.length} cotizaciones, ${categorias.length} categorías, ${estadosCotizacion.length} estados, ${experiencias.length} experiencias, ${motivosEvento.length} motivos y ${camposPersonalizados.length} campos personalizados.`, 'success');
 }
 
 function importarBaseDatos() {
@@ -2899,7 +3448,7 @@ function importarBaseDatos() {
                     throw new Error('Formato de archivo inválido');
                 }
                 
-                if (confirm(`¿Estás seguro de importar esta base de datos?\nProductos: ${baseDatos.productos.length}\nCotizaciones: ${baseDatos.cotizaciones.length}\nCategorías: ${baseDatos.categorias?.length || 0}\nEstados: ${baseDatos.estadosCotizacion?.length || 0}\nExperiencias: ${baseDatos.experiencias?.length || 0}\nMotivos: ${baseDatos.motivosEvento?.length || 0}\n\nEsto REEMPLAZARÁ todos los datos actuales.`)) {
+                if (confirm(`¿Estás seguro de importar esta base de datos?\nProductos: ${baseDatos.productos.length}\nCotizaciones: ${baseDatos.cotizaciones.length}\nCategorías: ${baseDatos.categorias?.length || 0}\nEstados: ${baseDatos.estadosCotizacion?.length || 0}\nExperiencias: ${baseDatos.experiencias?.length || 0}\nMotivos: ${baseDatos.motivosEvento?.length || 0}\nCampos Personalizados: ${baseDatos.camposPersonalizados?.length || 0}\n\nEsto REEMPLAZARÁ todos los datos actuales.`)) {
                     localStorage.setItem('productos', JSON.stringify(baseDatos.productos));
                     localStorage.setItem('cotizaciones', JSON.stringify(baseDatos.cotizaciones));
                     
@@ -2915,6 +3464,9 @@ function importarBaseDatos() {
                     }
                     if (baseDatos.motivosEvento) {
                         localStorage.setItem('motivosEvento', JSON.stringify(baseDatos.motivosEvento));
+                    }
+                    if (baseDatos.camposPersonalizados) {
+                        localStorage.setItem('camposPersonalizados', JSON.stringify(baseDatos.camposPersonalizados));
                     }
                     if (baseDatos.politicas) {
                         localStorage.setItem('politicas', baseDatos.politicas);
@@ -2937,6 +3489,9 @@ function importarBaseDatos() {
                     if (baseDatos.motivosEvento) {
                         motivosEvento = baseDatos.motivosEvento;
                     }
+                    if (baseDatos.camposPersonalizados) {
+                        camposPersonalizados = baseDatos.camposPersonalizados;
+                    }
                     
                     // Actualizar todas las vistas
                     actualizarSelectCategorias();
@@ -2945,15 +3500,18 @@ function importarBaseDatos() {
                     actualizarListaEstados();
                     actualizarListaExperiencias();
                     actualizarListaMotivos();
+                    actualizarListaCamposPersonalizados();
                     actualizarListaProductos();
                     actualizarMenuSelector();
                     actualizarExperienciasCheckboxes();
                     actualizarMotivosCheckboxes();
+                    generarCamposPersonalizadosEnCotizador();
+                    actualizarVariablesCamposPersonalizados();
                     cargarHistorialCotizaciones();
                     cargarPoliticas();
                     cargarPlantilla();
                     
-                    mostrarAlerta('alertHistorial', `Base de datos importada exitosamente: ${baseDatos.productos.length} productos, ${baseDatos.cotizaciones.length} cotizaciones, ${baseDatos.categorias?.length || 0} categorías, ${baseDatos.estadosCotizacion?.length || 0} estados, ${baseDatos.experiencias?.length || 0} experiencias y ${baseDatos.motivosEvento?.length || 0} motivos.`, 'success');
+                    mostrarAlerta('alertHistorial', `Base de datos importada exitosamente: ${baseDatos.productos.length} productos, ${baseDatos.cotizaciones.length} cotizaciones, ${baseDatos.categorias?.length || 0} categorías, ${baseDatos.estadosCotizacion?.length || 0} estados, ${baseDatos.experiencias?.length || 0} experiencias, ${baseDatos.motivosEvento?.length || 0} motivos y ${baseDatos.camposPersonalizados?.length || 0} campos personalizados.`, 'success');
                 }
             } catch (error) {
                 mostrarAlerta('alertHistorial', 'Error al importar: archivo inválido o corrupto.', 'error');

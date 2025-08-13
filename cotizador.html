@@ -5,15 +5,151 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cotizador de Eventos Gastronómicos</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Estilos para impresión del resumen */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            .print-only {
+                display: block !important;
+            }
+            
+            body {
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            
+            .container {
+                background: white !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                max-width: none !important;
+                width: 100% !important;
+            }
+            
+            .header, .tabs {
+                display: none !important;
+            }
+            
+            .tab-content {
+                display: block !important;
+                padding: 20px !important;
+            }
+            
+            .cotizacion-resumen {
+                background: white !important;
+                box-shadow: none !important;
+                border: 1px solid #ddd !important;
+                margin: 0 !important;
+                padding: 30px !important;
+            }
+            
+            .cotizacion-header {
+                border-bottom: 2px solid #000 !important;
+                padding-bottom: 20px !important;
+                margin-bottom: 30px !important;
+            }
+            
+            .info-box {
+                background: #f8f9fa !important;
+                border: 1px solid #ddd !important;
+            }
+            
+            table {
+                border: 1px solid #000 !important;
+            }
+            
+            th, td {
+                border: 1px solid #000 !important;
+                padding: 10px !important;
+            }
+            
+            .total-section {
+                background: #f0f0f0 !important;
+                color: #000 !important;
+                border: 2px solid #000 !important;
+            }
+        }
+
+        /* Estilos para vista de presentación */
+        .vista-presentacion {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            font-family: 'Times New Roman', serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .vista-presentacion h3 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 30px;
+        }
+
+        .vista-presentacion .cotizacion-header {
+            border: none;
+            background: #f8f9fa;
+            border-radius: 0;
+            margin-bottom: 30px;
+        }
+
+        .vista-presentacion .info-box {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0;
+            border-left: 4px solid #3498db;
+        }
+
+        .vista-presentacion table {
+            border: 1px solid #333;
+            font-size: 0.9rem;
+        }
+
+        .vista-presentacion th {
+            background: #34495e;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .vista-presentacion td {
+            border: 1px solid #ddd;
+        }
+
+        .vista-presentacion .total-section {
+            background: #ecf0f1;
+            color: #2c3e50;
+            border: 2px solid #34495e;
+            border-radius: 0;
+        }
+
+        .vista-presentacion .politicas-section {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 0;
+            padding: 20px;
+            margin-top: 30px;
+            font-size: 0.9rem;
+            white-space: pre-line;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <div class="header no-print">
             <h1>🍽️ Cotizador de Eventos</h1>
             <p>Gestión integral de productos y cotizaciones gastronómicas</p>
         </div>
 
-        <div class="tabs">
+        <div class="tabs no-print">
             <button class="tab active" onclick="showTab('productos')">📦 Productos</button>
             <button class="tab" onclick="showTab('cotizador')">💰 Cotizador</button>
             <button class="tab" onclick="showTab('historial')">📋 Historial</button>
@@ -88,16 +224,16 @@
 
         <!-- TAB COTIZADOR -->
         <div id="cotizador" class="tab-content">
-            <h2 id="tituloCotizador">Nueva Cotización</h2>
+            <h2 id="tituloCotizador" class="no-print">Nueva Cotización</h2>
             
             <!-- Indicador de versión cuando se está editando -->
-            <div id="indicadorVersion" style="display: none; margin: 20px 0; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; text-align: center;">
+            <div id="indicadorVersion" class="no-print" style="display: none; margin: 20px 0; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; text-align: center;">
                 <h3 style="margin: 0; color: white;">✏️ Editando Cotización</h3>
                 <p style="margin: 5px 0 0 0; font-size: 1.1rem;" id="nombreVersionEditando"></p>
             </div>
 
             <!-- Datos del Cliente -->
-            <div class="categoria-section">
+            <div class="categoria-section no-print">
                 <h3 class="categoria-title">📋 Datos del Cliente</h3>
                 <div class="form-row">
                     <div class="form-group">
@@ -130,10 +266,13 @@
                         </select>
                     </div>
                 </div>
+                
+                <!-- Campos personalizados se insertarán aquí -->
+                <div id="camposPersonalizados"></div>
             </div>
 
             <!-- Motivo del Evento -->
-            <div class="categoria-section">
+            <div class="categoria-section no-print">
                 <h3 class="categoria-title">🎉 Motivo del Evento</h3>
                 <div id="motivosCheckboxGroup" class="checkbox-group">
                     <!-- Se cargarán dinámicamente desde la gestión -->
@@ -141,7 +280,7 @@
             </div>
 
             <!-- Experiencias -->
-            <div class="categoria-section">
+            <div class="categoria-section no-print">
                 <h3 class="categoria-title">🌟 Experiencias</h3>
                 <div id="experienciasCheckboxGroup" class="checkbox-group">
                     <!-- Se cargarán dinámicamente desde la gestión -->
@@ -149,7 +288,7 @@
             </div>
 
             <!-- Selección de Menú -->
-            <div class="categoria-section">
+            <div class="categoria-section no-print">
                 <h3 class="categoria-title">🍴 Selección de Menú</h3>
                 <div id="menuSelector">
                     <!-- Se cargará dinámicamente según los productos -->
@@ -157,7 +296,7 @@
             </div>
 
             <!-- ELIMINAR BOTONES DE GENERAR Y LIMPIAR YA QUE SERÁ AUTOMÁTICO -->
-            <div style="text-align: center; margin: 20px 0;">
+            <div class="no-print" style="text-align: center; margin: 20px 0;">
                 <button class="btn" onclick="limpiarCotizacion()">🔄 Limpiar Formulario</button>
                 <div style="margin-top: 10px; padding: 15px; background: #e3f2fd; border-radius: 10px; color: #1976d2; font-size: 0.9rem;">
                     <strong>✨ Actualización en Tiempo Real:</strong> El resumen se actualiza automáticamente mientras completas los datos
@@ -169,7 +308,7 @@
                 <!-- Se generará dinámicamente en tiempo real -->
             </div>
 
-            <div id="alertCotizacion"></div>
+            <div id="alertCotizacion" class="no-print"></div>
         </div>
 
         <!-- TAB HISTORIAL -->
@@ -240,6 +379,70 @@
         <div id="gestiones" class="tab-content">
             <h2>Gestión de Datos del Sistema</h2>
             
+            <!-- Gestión de Datos del Cliente -->
+            <div style="margin-bottom: 40px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #17a2b8;">
+                <h3 style="color: #17a2b8; margin-bottom: 20px;">📋 Gestión de Datos del Cliente</h3>
+                
+                <div style="margin-bottom: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px; color: #1976d2;">
+                    <strong>💡 Campos Personalizados:</strong> Agrega campos adicionales que aparecerán en la sección "Datos del Cliente" del cotizador y estarán disponibles como variables en las plantillas de descarga.
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label for="nombreCampo">Nombre del Campo:</label>
+                        <input type="text" id="nombreCampo" placeholder="Ej: Dirección del evento">
+                    </div>
+                    <div class="form-group">
+                        <label for="tipoCampo">Tipo de Campo:</label>
+                        <select id="tipoCampo">
+                            <option value="texto">📝 Texto</option>
+                            <option value="numero">🔢 Número</option>
+                            <option value="fecha">📅 Fecha</option>
+                            <option value="hora">🕐 Hora</option>
+                            <option value="checkbox">☑️ Checkbox</option>
+                            <option value="desplegable">📋 Desplegable</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="placeholderCampo">Placeholder/Ayuda:</label>
+                        <input type="text" id="placeholderCampo" placeholder="Texto de ayuda para el usuario">
+                    </div>
+                    <div class="form-group">
+                        <label for="requeridoCampo">¿Campo Requerido?</label>
+                        <select id="requeridoCampo">
+                            <option value="false">No</option>
+                            <option value="true">Sí</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group" id="opcionesDesplegableContainer" style="display: none;">
+                    <label for="opcionesDesplegable">Opciones del Desplegable:</label>
+                    <textarea id="opcionesDesplegable" rows="3" placeholder="Escribe cada opción en una línea separada&#10;Opción 1&#10;Opción 2&#10;Opción 3"></textarea>
+                    <small style="color: #6c757d; margin-top: 5px; display: block;">Una opción por línea</small>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="agregarCampoPersonalizado()" style="background: #17a2b8; color: white;">➕ Agregar Campo</button>
+                    <button class="btn" onclick="limpiarFormularioCampo()" style="background: #6c757d; color: white;">🔄 Limpiar</button>
+                </div>
+
+                <div id="alertCamposPersonalizados" style="margin: 15px 0;"></div>
+
+                <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px; color: #856404;">
+                    <strong>📝 Variables Disponibles:</strong><br>
+                    Los campos personalizados estarán disponibles en las plantillas como <code>[nombre_del_campo]</code><br>
+                    Ejemplo: Si creas un campo "Dirección del evento", la variable será <code>[direccion_del_evento]</code>
+                </div>
+
+                <div id="listaCamposPersonalizados" style="margin-top: 20px;">
+                    <!-- Los campos personalizados se cargarán aquí -->
+                </div>
+            </div>
+            
             <!-- Gestión de Experiencias -->
             <div style="margin-bottom: 40px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #28a745;">
                 <h3 style="color: #28a745; margin-bottom: 20px;">🌟 Gestión de Experiencias</h3>
@@ -295,7 +498,7 @@
                 <div class="form-group">
                     <label for="politicas">Políticas de la Empresa:</label>
                     <textarea id="politicas" rows="8" placeholder="Ingresa las políticas que aparecerán en las cotizaciones..." style="width: 100%;"></textarea>
-                    <small style="color: #6c757d; margin-top: 5px; display: block;">Este texto aparecerá al final de todas las cotizaciones descargadas</small>
+                    <small style="color: #6c757d; margin-top: 5px; display: block;">Este texto aparecerá al final de todas las cotizaciones descargadas y en el resumen para el cliente</small>
                 </div>
 
                 <div style="margin-top: 15px;">
@@ -325,7 +528,8 @@
                     <code>[margen]</code> - Margen de ganancia<br>
                     <code>[porcentaje_margen]</code> - Porcentaje de margen<br>
                     <code>[fecha_cotizacion]</code> - Fecha de creación<br>
-                    <code>[politicas]</code> - Políticas de la empresa
+                    <code>[politicas]</code> - Políticas de la empresa<br>
+                    <span id="variablesCamposPersonalizados"></span>
                 </div>
                 
                 <div class="form-group">
