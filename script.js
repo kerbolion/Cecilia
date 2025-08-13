@@ -25,6 +25,29 @@ let cotizacionSeleccionada = null; // Para el manejo de versiones
 let editandoCotizacion = false; // Para saber si estamos editando una cotización existente
 let cotizacionOriginalEnEdicion = null; // Para mantener referencia a la cotización original
 
+// Función para crear una copia profunda de objetos
+function copiarProfundo(obj) {
+    if (obj === null || typeof obj !== 'object') {
+        return obj;
+    }
+    
+    if (obj instanceof Date) {
+        return new Date(obj);
+    }
+    
+    if (obj instanceof Array) {
+        return obj.map(item => copiarProfundo(item));
+    }
+    
+    if (typeof obj === 'object') {
+        const copy = {};
+        Object.keys(obj).forEach(key => {
+            copy[key] = copiarProfundo(obj[key]);
+        });
+        return copy;
+    }
+}
+
 // Gestión de tabs
 function showTab(tabName) {
     // Ocultar todos los contenidos
@@ -1257,9 +1280,17 @@ function generarCotizacion() {
     const costoTotal = productosSeleccionados.reduce((sum, p) => sum + (p.costo * p.cantidad), 0);
     const margenTotal = subtotalProductos - costoTotal;
 
+    // Generar ID único para nueva cotización o mantener el existente si estamos editando
+    let cotizacionId;
+    if (editandoCotizacion && cotizacionOriginalEnEdicion) {
+        cotizacionId = cotizacionOriginalEnEdicion.id;
+    } else {
+        cotizacionId = Date.now();
+    }
+
     // Crear objeto de cotización
     cotizacionActual = {
-        id: Date.now(),
+        id: cotizacionId,
         fechaCotizacion: new Date().toLocaleDateString(),
         estado: estadoSeleccionado,
         cliente: {
@@ -1518,7 +1549,7 @@ function guardarCotizacion() {
         const fechaHora = `${ahora.toLocaleDateString()} ${ahora.toLocaleTimeString()}`;
         
         // Crear una copia completa SIN las versiones para guardar en el historial
-        const datosParaVersion = { ...cotizacionActual };
+        const datosParaVersion = copiarProfundo(cotizacionActual);
         delete datosParaVersion.versiones;
         delete datosParaVersion.versionActual;
         
@@ -1593,7 +1624,7 @@ function crearNuevaVersion(cotizacionExistente, nuevosDatos) {
         const fechaHoraMigrada = `${fechaOriginal.toLocaleDateString()} ${fechaOriginal.toLocaleTimeString()}`;
         
         // Crear una copia completa de los datos originales SIN las versiones
-        const datosOriginales = { ...cotizacionExistente };
+        const datosOriginales = copiarProfundo(cotizacionExistente);
         delete datosOriginales.versiones;
         delete datosOriginales.versionActual;
         
@@ -1610,8 +1641,8 @@ function crearNuevaVersion(cotizacionExistente, nuevosDatos) {
     const ahora = new Date();
     const fechaHora = `${ahora.toLocaleDateString()} ${ahora.toLocaleTimeString()}`;
     
-    // Crear una copia completa de los nuevos datos SIN las versiones
-    const datosNuevos = { ...nuevosDatos };
+    // Crear una copia completa de los nuevos datos SIN las versiones usando copiarProfundo
+    const datosNuevos = copiarProfundo(nuevosDatos);
     delete datosNuevos.versiones;
     delete datosNuevos.versionActual;
     
@@ -1624,7 +1655,7 @@ function crearNuevaVersion(cotizacionExistente, nuevosDatos) {
     });
 
     // Actualizar datos principales con la nueva versión
-    Object.assign(cotizacionExistente, nuevosDatos);
+    Object.assign(cotizacionExistente, copiarProfundo(nuevosDatos));
     cotizacionExistente.versionActual = siguienteVersion;
 }
 
@@ -1778,10 +1809,15 @@ function migrarCotizacionAVersiones(cotizacionId) {
     const fechaOriginal = new Date(cotizacion.fechaCotizacion + 'T00:00:00');
     const fechaHora = `${fechaOriginal.toLocaleDateString()} ${fechaOriginal.toLocaleTimeString()}`;
     
+    // Usar copiarProfundo para evitar referencias
+    const datosOriginales = copiarProfundo(cotizacion);
+    delete datosOriginales.versiones;
+    delete datosOriginales.versionActual;
+    
     cotizacion.versiones = [{
         version: 1,
         fecha: fechaOriginal.toISOString(),
-        datos: { ...cotizacion },
+        datos: datosOriginales,
         descripcion: `v1 - ${fechaHora} (migrada)`
     }];
     cotizacion.versionActual = 1;
@@ -1920,8 +1956,8 @@ function compararVersion(cotizacionId, numeroVersion) {
                         <div style="background: #fff5f5; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
                             <h5 style="color: #dc3545; margin-top: 0;">💰 Totales:</h5>
                             <p><strong>Subtotal:</strong> $${versionAnterior.datos.totales?.subtotal?.toFixed(2) || '0.00'}</p>
-                            <p><strong>IVA:</strong> $${versionAnterior.datos.totales?.iva?.toFixed(2) || '0.00'}</p>
-                            <p><strong>Total:</strong> $${versionAnterior.datos.totales?.total?.toFixed(2) || '0.00'}</p>
+                            <p><strong>Costo:</strong> $${versionAnterior.datos.totales?.costoTotal?.toFixed(2) || '0.00'}</p>
+                            <p><strong>Margen:</strong> $${versionAnterior.datos.totales?.margenTotal?.toFixed(2) || '0.00'}</p>
                         </div>
                         
                         <div style="margin-bottom: 15px;">
@@ -1954,8 +1990,8 @@ function compararVersion(cotizacionId, numeroVersion) {
                         <div style="background: #f8fff8; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
                             <h5 style="color: #28a745; margin-top: 0;">💰 Totales:</h5>
                             <p><strong>Subtotal:</strong> $${versionActual.datos.totales?.subtotal?.toFixed(2) || '0.00'}</p>
-                            <p><strong>IVA:</strong> $${versionActual.datos.totales?.iva?.toFixed(2) || '0.00'}</p>
-                            <p><strong>Total:</strong> $${versionActual.datos.totales?.total?.toFixed(2) || '0.00'}</p>
+                            <p><strong>Costo:</strong> $${versionActual.datos.totales?.costoTotal?.toFixed(2) || '0.00'}</p>
+                            <p><strong>Margen:</strong> $${versionActual.datos.totales?.margenTotal?.toFixed(2) || '0.00'}</p>
                         </div>
                         
                         <div style="margin-bottom: 15px;">
@@ -1979,8 +2015,8 @@ function compararVersion(cotizacionId, numeroVersion) {
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                         <div>
                             <strong>💰 Diferencia Total:</strong><br>
-                            <span style="font-size: 1.2rem; font-weight: 600; color: ${(versionActual.datos.totales?.total || 0) > (versionAnterior.datos.totales?.total || 0) ? '#28a745' : '#dc3545'};">
-                                ${(versionActual.datos.totales?.total || 0) > (versionAnterior.datos.totales?.total || 0) ? '+' : ''}$${((versionActual.datos.totales?.total || 0) - (versionAnterior.datos.totales?.total || 0)).toFixed(2)}
+                            <span style="font-size: 1.2rem; font-weight: 600; color: ${(versionActual.datos.totales?.subtotal || 0) > (versionAnterior.datos.totales?.subtotal || 0) ? '#28a745' : '#dc3545'};">
+                                ${(versionActual.datos.totales?.subtotal || 0) > (versionAnterior.datos.totales?.subtotal || 0) ? '+' : ''}$${((versionActual.datos.totales?.subtotal || 0) - (versionAnterior.datos.totales?.subtotal || 0)).toFixed(2)}
                             </span>
                         </div>
                         <div>
@@ -2031,17 +2067,20 @@ function restaurarVersion(cotizacionId, numeroVersion) {
     const ahora = new Date();
     const fechaHora = `${ahora.toLocaleDateString()} ${ahora.toLocaleTimeString()}`;
     
+    // Usar copiarProfundo para evitar referencias
+    const datosRestaurados = copiarProfundo(versionARestaurar.datos);
+    
     const nuevaVersion = {
         version: siguienteVersion,
         fecha: ahora.toISOString(),
-        datos: { ...versionARestaurar.datos },
+        datos: datosRestaurados,
         descripcion: `v${siguienteVersion} - ${fechaHora} (restaurada de v${numeroVersion})`
     };
     
     cotizacion.versiones.push(nuevaVersion);
     
     // Actualizar datos principales
-    Object.assign(cotizacion, versionARestaurar.datos);
+    Object.assign(cotizacion, copiarProfundo(versionARestaurar.datos));
     cotizacion.versionActual = siguienteVersion;
     
     localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
@@ -2064,15 +2103,13 @@ function crearRamaDesdeVersion(cotizacionId, numeroVersion) {
     const versionBase = cotizacion.versiones.find(v => v.version === numeroVersion);
     if (!versionBase) return;
     
-    // Crear nueva cotización basada en la versión seleccionada
-    const nuevaCotizacion = {
-        ...versionBase.datos,
-        id: Date.now(),
-        fechaCotizacion: new Date().toLocaleDateString(),
-        cliente: {
-            ...versionBase.datos.cliente,
-            nombre: versionBase.datos.cliente.nombre + ` (Rama v${numeroVersion})`
-        }
+    // Crear nueva cotización basada en la versión seleccionada usando copiarProfundo
+    const nuevaCotizacion = copiarProfundo(versionBase.datos);
+    nuevaCotizacion.id = Date.now();
+    nuevaCotizacion.fechaCotizacion = new Date().toLocaleDateString();
+    nuevaCotizacion.cliente = {
+        ...nuevaCotizacion.cliente,
+        nombre: nuevaCotizacion.cliente.nombre + ` (Rama v${numeroVersion})`
     };
     
     // Cargar en el formulario para editar
@@ -2263,7 +2300,7 @@ function mostrarCotizacionesEnTabla(cotizaciones) {
                 </td>
                 <td style="padding: 15px; text-align: center; font-weight: 600;">${cot.cliente.cantidadPersonas}</td>
                 <td style="padding: 15px; text-align: center;">
-                    <div style="font-weight: 700; font-size: 1.1rem; color: #28a745;">${cot.totales.subtotal.toFixed(2)}</div>
+                    <div style="font-weight: 700; font-size: 1.1rem; color: #28a745;">$${cot.totales.subtotal.toFixed(2)}</div>
                     <small style="color: #6c757d;">Margen: ${cot.totales.porcentajeMargen}%</small>
                 </td>
                 <td style="padding: 15px; text-align: center;">
@@ -2296,8 +2333,8 @@ function mostrarCotizacionesEnTabla(cotizaciones) {
         <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 10px; text-align: center;">
             <strong>📊 Resumen:</strong> 
             ${cotizaciones.length} cotizaciones | 
-            Total facturado: ${cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0).toFixed(2)} |
-            Promedio por cotización: ${cotizaciones.length > 0 ? (cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0) / cotizaciones.length).toFixed(2) : '0.00'}
+            Total facturado: $${cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0).toFixed(2)} |
+            Promedio por cotización: $${cotizaciones.length > 0 ? (cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0) / cotizaciones.length).toFixed(2) : '0.00'}
         </div>
     `;
 
@@ -2330,7 +2367,7 @@ function verDetalleCotizacion(index) {
                         <strong>Personas:</strong><br>${cot.cliente.cantidadPersonas} (${cot.cliente.formatoEvento})
                     </div>
                     <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
-                        <strong>Total:</strong><br><span style="color: #28a745; font-weight: 700; font-size: 1.2rem;">${cot.totales.subtotal.toFixed(2)}</span>
+                        <strong>Total:</strong><br><span style="color: #28a745; font-weight: 700; font-size: 1.2rem;">$${cot.totales.subtotal.toFixed(2)}</span>
                     </div>
                 </div>
 
@@ -2348,9 +2385,9 @@ function verDetalleCotizacion(index) {
                         ${cot.productos.map(p => `
                             <tr>
                                 <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">${p.nombre}</td>
-                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">${p.precio.toFixed(2)}</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">$${p.precio.toFixed(2)}</td>
                                 <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">${p.cantidad}</td>
-                                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #dee2e6; font-weight: 600;">${p.subtotal.toFixed(2)}</td>
+                                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #dee2e6; font-weight: 600;">$${p.subtotal.toFixed(2)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -2359,15 +2396,15 @@ function verDetalleCotizacion(index) {
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px;">
                     <div style="text-align: center; padding: 15px; background: #fff3cd; border-radius: 10px;">
                         <div style="font-size: 0.9rem; color: #856404;">Costo Total</div>
-                        <div style="font-size: 1.3rem; font-weight: 600; color: #856404;">${cot.totales.costoTotal.toFixed(2)}</div>
+                        <div style="font-size: 1.3rem; font-weight: 600; color: #856404;">$${cot.totales.costoTotal.toFixed(2)}</div>
                     </div>
                     <div style="text-align: center; padding: 15px; background: #d1ecf1; border-radius: 10px;">
                         <div style="font-size: 0.9rem; color: #0c5460;">Margen</div>
-                        <div style="font-size: 1.3rem; font-weight: 600; color: #0c5460;">${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)</div>
+                        <div style="font-size: 1.3rem; font-weight: 600; color: #0c5460;">$${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)</div>
                     </div>
                     <div style="text-align: center; padding: 15px; background: #d4edda; border-radius: 10px;">
                         <div style="font-size: 0.9rem; color: #155724;">Total</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #155724;">${cot.totales.subtotal.toFixed(2)}</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #155724;">$${cot.totales.subtotal.toFixed(2)}</div>
                     </div>
                 </div>
             </div>
@@ -2500,14 +2537,13 @@ function duplicarCotizacion(index) {
     
     if (!cot) return;
 
-    const nuevaCotizacion = {
-        ...cot,
-        id: Date.now(),
-        fechaCotizacion: new Date().toLocaleDateString(),
-        cliente: {
-            ...cot.cliente,
-            nombre: cot.cliente.nombre + ' (Copia)'
-        }
+    // Usar copiarProfundo para evitar referencias
+    const nuevaCotizacion = copiarProfundo(cot);
+    nuevaCotizacion.id = Date.now();
+    nuevaCotizacion.fechaCotizacion = new Date().toLocaleDateString();
+    nuevaCotizacion.cliente = {
+        ...nuevaCotizacion.cliente,
+        nombre: nuevaCotizacion.cliente.nombre + ' (Copia)'
     };
 
     cotizaciones.push(nuevaCotizacion);
@@ -2557,11 +2593,11 @@ function exportarCotizaciones() {
         contenido += `Cliente: ${cot.cliente.nombre}\n`;
         contenido += `Fecha del Evento: ${cot.cliente.fechaEvento} ${cot.cliente.horaEvento}\n`;
         contenido += `Personas: ${cot.cliente.cantidadPersonas} (${cot.cliente.formatoEvento})\n`;
-        contenido += `Total: ${cot.totales.subtotal.toFixed(2)}\n`;
-        contenido += `Margen: ${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)\n`;
+        contenido += `Total: $${cot.totales.subtotal.toFixed(2)}\n`;
+        contenido += `Margen: $${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)\n`;
         contenido += `Productos:\n`;
         cot.productos.forEach(p => {
-            contenido += `  - ${p.nombre}: ${p.cantidad} x ${p.precio.toFixed(2)} = ${p.subtotal.toFixed(2)}\n`;
+            contenido += `  - ${p.nombre}: ${p.cantidad} x $${p.precio.toFixed(2)} = $${p.subtotal.toFixed(2)}\n`;
         });
         contenido += `Fecha de cotización: ${cot.fechaCotizacion}\n\n`;
     });
@@ -2571,8 +2607,8 @@ function exportarCotizaciones() {
 
     contenido += `RESUMEN GENERAL:\n`;
     contenido += `================\n`;
-    contenido += `Total facturado: ${totalFacturado.toFixed(2)}\n`;
-    contenido += `Promedio por cotización: ${promedioFacturado.toFixed(2)}\n`;
+    contenido += `Total facturado: $${totalFacturado.toFixed(2)}\n`;
+    contenido += `Promedio por cotización: $${promedioFacturado.toFixed(2)}\n`;
 
     // Descargar archivo
     const blob = new Blob([contenido], { type: 'text/plain' });
@@ -2599,12 +2635,16 @@ function limpiarHistorial() {
 function exportarBaseDatos() {
     const productos = JSON.parse(localStorage.getItem('productos') || '[]');
     const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const categorias = JSON.parse(localStorage.getItem('categorias') || '[]');
+    const estadosCotizacion = JSON.parse(localStorage.getItem('estadosCotizacion') || '[]');
     
     const baseDatos = {
         productos: productos,
         cotizaciones: cotizaciones,
+        categorias: categorias,
+        estadosCotizacion: estadosCotizacion,
         fechaExportacion: new Date().toISOString(),
-        version: '1.0'
+        version: '2.0'
     };
     
     const contenidoJSON = JSON.stringify(baseDatos, null, 2);
@@ -2619,7 +2659,7 @@ function exportarBaseDatos() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    mostrarAlerta('alertHistorial', `Base de datos exportada: ${productos.length} productos y ${cotizaciones.length} cotizaciones.`, 'success');
+    mostrarAlerta('alertHistorial', `Base de datos exportada: ${productos.length} productos, ${cotizaciones.length} cotizaciones, ${categorias.length} categorías y ${estadosCotizacion.length} estados.`, 'success');
 }
 
 function importarBaseDatos() {
@@ -2640,22 +2680,41 @@ function importarBaseDatos() {
                     throw new Error('Formato de archivo inválido');
                 }
                 
-                if (confirm(`¿Estás seguro de importar esta base de datos?\nProductos: ${baseDatos.productos.length}\nCotizaciones: ${baseDatos.cotizaciones.length}\n\nEsto REEMPLAZARÁ todos los datos actuales.`)) {
+                if (confirm(`¿Estás seguro de importar esta base de datos?\nProductos: ${baseDatos.productos.length}\nCotizaciones: ${baseDatos.cotizaciones.length}\nCategorías: ${baseDatos.categorias?.length || 0}\nEstados: ${baseDatos.estadosCotizacion?.length || 0}\n\nEsto REEMPLAZARÁ todos los datos actuales.`)) {
                     localStorage.setItem('productos', JSON.stringify(baseDatos.productos));
                     localStorage.setItem('cotizaciones', JSON.stringify(baseDatos.cotizaciones));
                     
+                    // Importar categorías y estados si existen
+                    if (baseDatos.categorias) {
+                        localStorage.setItem('categorias', JSON.stringify(baseDatos.categorias));
+                    }
+                    if (baseDatos.estadosCotizacion) {
+                        localStorage.setItem('estadosCotizacion', JSON.stringify(baseDatos.estadosCotizacion));
+                    }
+                    
                     // Actualizar las variables globales
                     productos = baseDatos.productos;
+                    if (baseDatos.categorias) {
+                        categorias = baseDatos.categorias;
+                    }
+                    if (baseDatos.estadosCotizacion) {
+                        estadosCotizacion = baseDatos.estadosCotizacion;
+                    }
                     
                     // Actualizar todas las vistas
+                    actualizarSelectCategorias();
+                    actualizarSelectEstados();
+                    actualizarListaCategorias();
+                    actualizarListaEstados();
                     actualizarListaProductos();
                     actualizarMenuSelector();
                     cargarHistorialCotizaciones();
                     
-                    mostrarAlerta('alertHistorial', `Base de datos importada exitosamente: ${baseDatos.productos.length} productos y ${baseDatos.cotizaciones.length} cotizaciones.`, 'success');
+                    mostrarAlerta('alertHistorial', `Base de datos importada exitosamente: ${baseDatos.productos.length} productos, ${baseDatos.cotizaciones.length} cotizaciones, ${baseDatos.categorias?.length || 0} categorías y ${baseDatos.estadosCotizacion?.length || 0} estados.`, 'success');
                 }
             } catch (error) {
                 mostrarAlerta('alertHistorial', 'Error al importar: archivo inválido o corrupto.', 'error');
+                console.error('Error de importación:', error);
             }
         };
         reader.readAsText(file);
