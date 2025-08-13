@@ -48,6 +48,185 @@ function copiarProfundo(obj) {
     }
 }
 
+// Función para actualizar el resumen en tiempo real
+function actualizarResumenTiempoReal() {
+    // Validar datos básicos
+    const nombreCliente = document.getElementById('nombreCliente').value.trim();
+    const fechaEvento = document.getElementById('fechaEvento').value;
+    const cantidadPersonas = parseInt(document.getElementById('cantidadPersonas').value);
+    const formatoEvento = document.getElementById('formatoEvento').value;
+    const estadoSeleccionado = document.getElementById('estadoCotizacion').value;
+
+    // Si no hay datos mínimos, ocultar resumen
+    if (!nombreCliente || !fechaEvento || !cantidadPersonas) {
+        document.getElementById('resumenCotizacion').style.display = 'none';
+        return;
+    }
+
+    // Recopilar motivos seleccionados
+    const motivosSeleccionados = Array.from(document.querySelectorAll('input[name="motivo"]:checked')).map(cb => cb.value);
+    
+    // Recopilar experiencias seleccionadas
+    const experienciasSeleccionadas = Array.from(document.querySelectorAll('input[name="experiencia"]:checked')).map(cb => cb.value);
+
+    // Recopilar productos del menú seleccionados
+    const productosSeleccionados = [];
+    
+    // Buscar todos los productos seleccionados
+    productos.forEach(producto => {
+        const checkbox = document.getElementById(`producto_${producto.id}`);
+        const cantidadInput = document.getElementById(`cantidad_${producto.id}`);
+        
+        if (checkbox && checkbox.checked && cantidadInput) {
+            const cantidad = parseInt(cantidadInput.value) || 0;
+            if (cantidad > 0) {
+                productosSeleccionados.push({
+                    ...producto,
+                    cantidad: cantidad,
+                    subtotal: producto.precio * cantidad
+                });
+            }
+        }
+    });
+
+    // Si no hay productos, mostrar mensaje pero mantener estructura
+    if (productosSeleccionados.length === 0) {
+        mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, formatoEvento, estadoSeleccionado, motivosSeleccionados, experienciasSeleccionadas);
+        return;
+    }
+
+    // Calcular totales
+    const subtotalProductos = productosSeleccionados.reduce((sum, p) => sum + p.subtotal, 0);
+    const costoTotal = productosSeleccionados.reduce((sum, p) => sum + (p.costo * p.cantidad), 0);
+    const margenTotal = subtotalProductos - costoTotal;
+
+    // Generar ID único para nueva cotización o mantener el existente si estamos editando
+    let cotizacionId;
+    if (editandoCotizacion && cotizacionOriginalEnEdicion) {
+        cotizacionId = cotizacionOriginalEnEdicion.id;
+    } else {
+        cotizacionId = Date.now();
+    }
+
+    // Actualizar objeto de cotización
+    cotizacionActual = {
+        id: cotizacionId,
+        fechaCotizacion: new Date().toLocaleDateString(),
+        estado: estadoSeleccionado,
+        cliente: {
+            nombre: nombreCliente,
+            fechaEvento: new Date(fechaEvento).toLocaleDateString(),
+            horaEvento: new Date(fechaEvento).toLocaleTimeString(),
+            fechaEventoOriginal: fechaEvento,
+            cantidadPersonas,
+            formatoEvento
+        },
+        motivos: motivosSeleccionados,
+        experiencias: experienciasSeleccionadas,
+        productos: productosSeleccionados,
+        totales: {
+            subtotal: subtotalProductos,
+            costoTotal,
+            margenTotal,
+            porcentajeMargen: costoTotal > 0 ? ((margenTotal / costoTotal) * 100).toFixed(1) : 0
+        }
+    };
+
+    mostrarResumenCotizacion();
+}
+
+function mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, formatoEvento, estadoSeleccionado, motivosSeleccionados, experienciasSeleccionadas) {
+    const container = document.getElementById('resumenCotizacion');
+    const estadoCotizacion = estadosCotizacion.find(est => est.id === estadoSeleccionado) || estadosCotizacion[0];
+
+    const motivosTexto = {
+        'cumpleanos': '🎂 Cumpleaños',
+        'celebracion_especial': '✨ Celebración Especial',
+        'aniversarios': '💕 Aniversarios y Bodas',
+        'reunion_familiar': '👨‍👩‍👧‍👦 Reuniones Familiares',
+        'encuentro_amigos': '👥 Encuentro de Amigos',
+        'corporativo': '🏢 Evento Corporativo',
+        'team_building': '🤝 Team Building',
+        'comercial': '💼 Evento Comercial'
+    };
+
+    const experienciasTexto = {
+        'cena_almuerzo': '🍽️ Cenas/Almuerzo',
+        'cena_maridada': '🍷 Cenas Maridadas por Pasos',
+        'cata_vinos': '🍾 Cata de Vinos',
+        'finger_food': '🥂 Finger Food & Lounge',
+        'after_office': '🌆 After Office',
+        'cocteles': '🍸 Cócteles de Autor',
+        'show_cooking': '👨‍🍳 Show Cooking',
+        'brunch': '🥞 Brunch'
+    };
+
+    let html = `
+        <div class="cotizacion-resumen">
+            <h3 style="color: #667eea; margin-bottom: 20px; text-align: center;">📊 Vista Previa de Cotización</h3>
+            
+            <div class="cotizacion-header">
+                <div class="info-box">
+                    <div class="info-label">Cliente</div>
+                    <div class="info-value">${nombreCliente}</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Estado</div>
+                    <div class="info-value" style="color: ${estadoCotizacion.color}; display: flex; align-items: center; gap: 5px;">
+                        <span>${estadoCotizacion.icono}</span>
+                        <span>${estadoCotizacion.nombre}</span>
+                    </div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Fecha del Evento</div>
+                    <div class="info-value">${new Date(fechaEvento).toLocaleDateString()}</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Hora</div>
+                    <div class="info-value">${new Date(fechaEvento).toLocaleTimeString()}</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Personas</div>
+                    <div class="info-value">${cantidadPersonas} (${formatoEvento})</div>
+                </div>
+            </div>
+
+            ${motivosSeleccionados.length > 0 ? `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #2c3e50; margin-bottom: 10px;">Motivo del Evento:</h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                        ${motivosSeleccionados.map(m => `<span style="background: #667eea; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${motivosTexto[m] || m}</span>`).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${experienciasSeleccionadas.length > 0 ? `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #2c3e50; margin-bottom: 10px;">Experiencias Seleccionadas:</h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                        ${experienciasSeleccionadas.map(e => `<span style="background: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${experienciasTexto[e] || e}</span>`).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
+            <div style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 15px; margin: 20px 0;">
+                <div style="font-size: 3rem; margin-bottom: 15px;">🍽️</div>
+                <h4 style="color: #6c757d; margin-bottom: 10px;">No hay productos seleccionados</h4>
+                <p style="color: #6c757d;">Selecciona productos del menú para ver el detalle y total de la cotización</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn" onclick="descargarCotizacion()" disabled style="opacity: 0.5;">📄 Descargar TXT</button>
+                <button class="btn" onclick="guardarCotizacion()" disabled style="opacity: 0.5;">💾 Guardar Cotización</button>
+                <div style="margin-top: 10px; font-size: 0.9rem; color: #6c757d;">Agrega productos para habilitar las acciones</div>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+    container.style.display = 'block';
+}
+
 // Gestión de tabs
 function showTab(tabName) {
     // Ocultar todos los contenidos
@@ -65,6 +244,11 @@ function showTab(tabName) {
     
     // Activar el tab correspondiente
     event.target.classList.add('active');
+    
+    // Si cambiamos al tab del cotizador, actualizar resumen
+    if (tabName === 'cotizador') {
+        setTimeout(actualizarResumenTiempoReal, 100);
+    }
 }
 
 // GESTIÓN DE PRODUCTOS
@@ -309,6 +493,9 @@ function actualizarSelectEstados() {
         // Seleccionar el primer estado por defecto (normalmente "Borrador")
         select.value = estadosOrdenados[0].id;
     }
+    
+    // Actualizar resumen cuando cambie el estado
+    actualizarResumenTiempoReal();
 }
 
 function agregarProducto() {
@@ -880,6 +1067,9 @@ function toggleCheckbox(element) {
     const checkbox = element.querySelector('input[type="checkbox"]');
     checkbox.checked = !checkbox.checked;
     element.classList.toggle('selected', checkbox.checked);
+    
+    // Actualizar resumen en tiempo real
+    actualizarResumenTiempoReal();
 }
 
 function actualizarMenuSelector() {
@@ -992,10 +1182,11 @@ function validarCantidad(productoId) {
     cantidadInput.value = cantidad;
     cantidadInput.max = maximoDisponible;
     
-    // Actualizar los máximos de todos los productos de la categoría
+    // Actualizar máximos de la categoría
     actualizarMaximosCategoria(producto.categoria);
 }
 
+// Actualizar los máximos de todos los productos de la categoría
 function actualizarMaximosCategoria(categoria) {
     const cantidadPersonas = parseInt(document.getElementById('cantidadPersonas').value) || 0;
     const productosCategoria = productos.filter(p => p.categoria === categoria);
@@ -1094,6 +1285,9 @@ function toggleProducto(productoId) {
         
         validarTotalesProductos();
     }
+    
+    // Actualizar resumen en tiempo real
+    actualizarResumenTiempoReal();
 }
 
 function calcularTotalProducto(productoId) {
@@ -1113,6 +1307,9 @@ function calcularTotalProducto(productoId) {
         
         // Actualizar validación de totales
         validarTotalesProductos();
+        
+        // Actualizar resumen en tiempo real
+        actualizarResumenTiempoReal();
     }
 }
 
@@ -1196,7 +1393,7 @@ function validarTotalesProductos() {
         if (!mensajeError) {
             document.getElementById('resumenValidacion').insertAdjacentHTML('beforeend', `
                 <div id="mensajeErrorValidacion" style="margin-top: 15px; padding: 12px; background: #f8d7da; color: #721c24; border-radius: 8px; border: 1px solid #f5c6cb;">
-                    <strong>⚠️ Error de validación:</strong> Hay categorías que exceden el número de invitados. Ajusta las cantidades antes de generar la cotización.
+                    <strong>⚠️ Error de validación:</strong> Hay categorías que exceden el número de invitados. Ajusta las cantidades antes de guardar la cotización.
                 </div>
             `);
         }
@@ -1207,113 +1404,6 @@ function validarTotalesProductos() {
     }
     
     return !hayErrores;
-}
-
-function generarCotizacion() {
-    // Validar datos básicos
-    const nombreCliente = document.getElementById('nombreCliente').value.trim();
-    const fechaEvento = document.getElementById('fechaEvento').value;
-    const cantidadPersonas = parseInt(document.getElementById('cantidadPersonas').value);
-    const formatoEvento = document.getElementById('formatoEvento').value;
-    const estadoSeleccionado = document.getElementById('estadoCotizacion').value;
-
-    if (!nombreCliente) {
-        mostrarAlerta('alertCotizacion', 'Por favor ingresa el nombre del cliente.', 'error');
-        return;
-    }
-
-    if (!fechaEvento) {
-        mostrarAlerta('alertCotizacion', 'Por favor selecciona la fecha del evento.', 'error');
-        return;
-    }
-
-    if (!cantidadPersonas || cantidadPersonas < 12) {
-        mostrarAlerta('alertCotizacion', 'La cantidad mínima es de 12 personas.', 'error');
-        return;
-    }
-
-    const maxPersonas = formatoEvento === 'sentado' ? 55 : 120;
-    if (cantidadPersonas > maxPersonas) {
-        mostrarAlerta('alertCotizacion', `Para formato ${formatoEvento} el máximo es ${maxPersonas} personas.`, 'error');
-        return;
-    }
-
-    // Recopilar motivos seleccionados
-    const motivosSeleccionados = Array.from(document.querySelectorAll('input[name="motivo"]:checked')).map(cb => cb.value);
-    
-    // Recopilar experiencias seleccionadas
-    const experienciasSeleccionadas = Array.from(document.querySelectorAll('input[name="experiencia"]:checked')).map(cb => cb.value);
-
-    // Recopilar productos del menú seleccionados
-    const productosSeleccionados = [];
-    
-    // Buscar todos los productos seleccionados
-    productos.forEach(producto => {
-        const checkbox = document.getElementById(`producto_${producto.id}`);
-        const cantidadInput = document.getElementById(`cantidad_${producto.id}`);
-        
-        if (checkbox && checkbox.checked && cantidadInput) {
-            const cantidad = parseInt(cantidadInput.value) || 0;
-            if (cantidad > 0) {
-                productosSeleccionados.push({
-                    ...producto,
-                    cantidad: cantidad,
-                    subtotal: producto.precio * cantidad
-                });
-            }
-        }
-    });
-
-    if (productosSeleccionados.length === 0) {
-        mostrarAlerta('alertCotizacion', 'Por favor selecciona al menos un producto del menú.', 'error');
-        return;
-    }
-
-    // Validar que las cantidades no excedan el número de invitados
-    if (!validarTotalesProductos()) {
-        mostrarAlerta('alertCotizacion', 'Hay productos que exceden el número de invitados. Revisa las cantidades antes de continuar.', 'error');
-        return;
-    }
-
-    // Calcular totales
-    const subtotalProductos = productosSeleccionados.reduce((sum, p) => sum + p.subtotal, 0);
-    const costoTotal = productosSeleccionados.reduce((sum, p) => sum + (p.costo * p.cantidad), 0);
-    const margenTotal = subtotalProductos - costoTotal;
-
-    // Generar ID único para nueva cotización o mantener el existente si estamos editando
-    let cotizacionId;
-    if (editandoCotizacion && cotizacionOriginalEnEdicion) {
-        cotizacionId = cotizacionOriginalEnEdicion.id;
-    } else {
-        cotizacionId = Date.now();
-    }
-
-    // Crear objeto de cotización
-    cotizacionActual = {
-        id: cotizacionId,
-        fechaCotizacion: new Date().toLocaleDateString(),
-        estado: estadoSeleccionado,
-        cliente: {
-            nombre: nombreCliente,
-            fechaEvento: new Date(fechaEvento).toLocaleDateString(),
-            horaEvento: new Date(fechaEvento).toLocaleTimeString(),
-            fechaEventoOriginal: fechaEvento,
-            cantidadPersonas,
-            formatoEvento
-        },
-        motivos: motivosSeleccionados,
-        experiencias: experienciasSeleccionadas,
-        productos: productosSeleccionados,
-        totales: {
-            subtotal: subtotalProductos,
-            costoTotal,
-            margenTotal,
-            porcentajeMargen: costoTotal > 0 ? ((margenTotal / costoTotal) * 100).toFixed(1) : 0
-        }
-    };
-
-    mostrarResumenCotizacion();
-    mostrarAlerta('alertCotizacion', 'Cotización generada exitosamente.', 'success');
 }
 
 function mostrarResumenCotizacion() {
@@ -1529,7 +1619,19 @@ function limpiarCotizacion(sinConfirmacion = false) {
 
 function guardarCotizacion() {
     if (!cotizacionActual.id) {
-        mostrarAlerta('alertCotizacion', 'No hay cotización para guardar.', 'error');
+        mostrarAlerta('alertCotizacion', 'No hay cotización para guardar. Completa los datos básicos del cliente.', 'error');
+        return;
+    }
+
+    // Validar que tenga productos
+    if (!cotizacionActual.productos || cotizacionActual.productos.length === 0) {
+        mostrarAlerta('alertCotizacion', 'No hay productos seleccionados. Agrega al menos un producto antes de guardar.', 'error');
+        return;
+    }
+
+    // Validar datos mínimos
+    if (!cotizacionActual.cliente.nombre || !cotizacionActual.cliente.fechaEvento || !cotizacionActual.cliente.cantidadPersonas) {
+        mostrarAlerta('alertCotizacion', 'Faltan datos básicos del cliente. Completa nombre, fecha y cantidad de personas.', 'error');
         return;
     }
 
@@ -1576,6 +1678,20 @@ function guardarCotizacion() {
     }
 }
 
+// Agregar eventos para actualización en tiempo real
+function agregarEventosActualizacion() {
+    // Eventos para campos del cliente
+    document.getElementById('nombreCliente').addEventListener('input', actualizarResumenTiempoReal);
+    document.getElementById('fechaEvento').addEventListener('change', actualizarResumenTiempoReal);
+    document.getElementById('cantidadPersonas').addEventListener('input', actualizarResumenTiempoReal);
+    document.getElementById('formatoEvento').addEventListener('change', actualizarResumenTiempoReal);
+    document.getElementById('estadoCotizacion').addEventListener('change', actualizarResumenTiempoReal);
+    
+    // Eventos para checkboxes (se manejan en toggleCheckbox)
+    
+    // Nota: Los eventos de productos se manejan directamente en las funciones toggleProducto y calcularTotalProducto
+}
+
 function entrarModoEdicion(cotizacionOriginal) {
     editandoCotizacion = true;
     cotizacionOriginalEnEdicion = cotizacionOriginal;
@@ -1589,15 +1705,10 @@ function entrarModoEdicion(cotizacionOriginal) {
     const indicador = document.getElementById('indicadorVersion');
     const nombreVersion = document.getElementById('nombreVersionEditando');
     const titulo = document.getElementById('tituloCotizador');
-    const boton = document.getElementById('botonGenerar');
     
     if (indicador) indicador.style.display = 'block';
     if (nombreVersion) nombreVersion.textContent = `v${proximaVersion} - ${fechaHora}`;
     if (titulo) titulo.textContent = 'Editando Cotización';
-    if (boton) {
-        boton.innerHTML = '💾 Guardar Nueva Versión';
-        boton.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
-    }
 }
 
 function salirModoEdicion() {
@@ -1607,14 +1718,9 @@ function salirModoEdicion() {
     // Ocultar indicador de versión
     const indicador = document.getElementById('indicadorVersion');
     const titulo = document.getElementById('tituloCotizador');
-    const boton = document.getElementById('botonGenerar');
     
     if (indicador) indicador.style.display = 'none';
     if (titulo) titulo.textContent = 'Nueva Cotización';
-    if (boton) {
-        boton.innerHTML = '📊 Generar Cotización';
-        boton.style.background = '';
-    }
 }
 
 function crearNuevaVersion(cotizacionExistente, nuevosDatos) {
@@ -1677,6 +1783,603 @@ function editarCotizacionParaNuevaVersion(cotizacionId) {
     mostrarAlerta('alertCotizacion', 'Cotización cargada. Al guardar se creará automáticamente una nueva versión.', 'success');
 }
 
+function descargarCotizacion() {
+    if (!cotizacionActual.id) {
+        mostrarAlerta('alertCotizacion', 'No hay cotización para descargar.', 'error');
+        return;
+    }
+
+    // Crear contenido del archivo
+    let contenido = `COTIZACIÓN DE EVENTO GASTRONÓMICO\n`;
+    contenido += `===============================\n\n`;
+    contenido += `Cliente: ${cotizacionActual.cliente.nombre}\n`;
+    contenido += `Fecha del Evento: ${cotizacionActual.cliente.fechaEvento}\n`;
+    contenido += `Hora: ${cotizacionActual.cliente.horaEvento}\n`;
+    contenido += `Cantidad de Personas: ${cotizacionActual.cliente.cantidadPersonas} (${cotizacionActual.cliente.formatoEvento})\n\n`;
+
+    if (cotizacionActual.motivos.length > 0) {
+        contenido += `Motivo del Evento:\n`;
+        cotizacionActual.motivos.forEach(motivo => {
+            contenido += `- ${motivo}\n`;
+        });
+        contenido += `\n`;
+    }
+
+    if (cotizacionActual.experiencias.length > 0) {
+        contenido += `Experiencias Seleccionadas:\n`;
+        cotizacionActual.experiencias.forEach(exp => {
+            contenido += `- ${exp}\n`;
+        });
+        contenido += `\n`;
+    }
+
+    contenido += `DETALLE DEL MENÚ:\n`;
+    contenido += `=================\n`;
+    cotizacionActual.productos.forEach(producto => {
+        contenido += `${producto.nombre}\n`;
+        contenido += `  Precio unitario: $${producto.precio.toFixed(2)}\n`;
+        contenido += `  Cantidad: ${producto.cantidad}\n`;
+        contenido += `  Subtotal: $${producto.subtotal.toFixed(2)}\n\n`;
+    });
+
+    contenido += `RESUMEN FINANCIERO:\n`;
+    contenido += `===================\n`;
+    contenido += `Costo Total: $${cotizacionActual.totales.costoTotal.toFixed(2)}\n`;
+    contenido += `Margen: $${cotizacionActual.totales.margenTotal.toFixed(2)} (${cotizacionActual.totales.porcentajeMargen}%)\n`;
+    contenido += `TOTAL: $${cotizacionActual.totales.subtotal.toFixed(2)}\n\n`;
+    contenido += `Cotización generada el: ${cotizacionActual.fechaCotizacion}\n`;
+
+    // Descargar archivo
+    const blob = new Blob([contenido], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cotizacion_${cotizacionActual.cliente.nombre.replace(/\s+/g, '_')}_${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    mostrarAlerta('alertCotizacion', 'Cotización descargada exitosamente.', 'success');
+}
+
+function mostrarAlerta(containerId, mensaje, tipo) {
+    const container = document.getElementById(containerId);
+    const alertClass = tipo === 'success' ? 'alert-success' : 'alert-error';
+    
+    container.innerHTML = `
+        <div class="alert ${alertClass}">
+            ${mensaje}
+        </div>
+    `;
+
+    setTimeout(() => {
+        container.innerHTML = '';
+    }, 5000);
+}
+
+// Inicializar la aplicación
+document.addEventListener('DOMContentLoaded', function() {
+    cargarCategorias();
+    cargarEstados();
+    cargarProductos();
+    actualizarSelectCategorias();
+    actualizarSelectEstados();
+    actualizarListaCategorias();
+    actualizarListaEstados();
+    actualizarListaProductos();
+    actualizarMenuSelector();
+    cargarHistorialCotizaciones();
+    
+    // Agregar eventos para actualización en tiempo real
+    agregarEventosActualizacion();
+    
+    // Inicializar historial de versiones
+    const historialVersiones = document.getElementById('historialVersiones');
+    if (historialVersiones) {
+        historialVersiones.innerHTML = '<p style="text-align: center; color: #6c757d; font-style: italic;">Selecciona una cotización de la tabla para ver su historial de versiones.</p>';
+    }
+});
+
+// GESTIÓN DEL HISTORIAL DE COTIZACIONES
+function cargarHistorialCotizaciones() {
+    mostrarTodasCotizaciones();
+}
+
+function mostrarTodasCotizaciones() {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    mostrarCotizacionesEnTabla(cotizaciones);
+}
+
+function buscarCotizaciones() {
+    const termino = document.getElementById('buscarCotizacion').value.toLowerCase();
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    
+    const cotizacionesFiltradas = cotizaciones.filter(cot => 
+        cot.cliente.nombre.toLowerCase().includes(termino) ||
+        cot.cliente.fechaEvento.includes(termino) ||
+        cot.fechaCotizacion.includes(termino)
+    );
+    
+    mostrarCotizacionesEnTabla(cotizacionesFiltradas);
+}
+
+function mostrarCotizacionesEnTabla(cotizaciones) {
+    const container = document.getElementById('tablaCotizaciones');
+    
+    if (cotizaciones.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #6c757d;">
+                <h3>📋 No hay cotizaciones guardadas</h3>
+                <p>Las cotizaciones que generes y guardes aparecerán aquí.</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <th style="padding: 15px; text-align: left;">Cliente</th>
+                        <th style="padding: 15px; text-align: center;">Estado</th>
+                        <th style="padding: 15px; text-align: center;">Fecha Evento</th>
+                        <th style="padding: 15px; text-align: center;">Personas</th>
+                        <th style="padding: 15px; text-align: center;">Total</th>
+                        <th style="padding: 15px; text-align: center;">Productos</th>
+                        <th style="padding: 15px; text-align: center;">Fecha Cotización</th>
+                        <th style="padding: 15px; text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    cotizaciones.forEach((cot, index) => {
+        const totalProductos = cot.productos.length;
+        const fechaClass = new Date(cot.cliente.fechaEvento) < new Date() ? 'color: #dc3545;' : 'color: #28a745;';
+        
+        // Obtener información del estado
+        const estadoCotizacion = estadosCotizacion.find(est => est.id === cot.estado) || { nombre: 'Sin estado', icono: '❓', color: '#6c757d' };
+        
+        html += `
+            <tr style="border-bottom: 1px solid #dee2e6; transition: background-color 0.3s ease;" 
+                onmouseover="this.style.backgroundColor='#f8f9fa'" 
+                onmouseout="this.style.backgroundColor='white'">
+                <td style="padding: 15px;">
+                    <strong style="${fechaClass}">${cot.cliente.nombre}</strong>
+                    <br><small style="color: #6c757d;">${cot.cliente.formatoEvento}</small>
+                </td>
+                <td style="padding: 15px; text-align: center;">
+                    <div style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; background: ${estadoCotizacion.color}15; color: ${estadoCotizacion.color}; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
+                        <span>${estadoCotizacion.icono}</span>
+                        <span>${estadoCotizacion.nombre}</span>
+                    </div>
+                </td>
+                <td style="padding: 15px; text-align: center;">
+                    <div>${cot.cliente.fechaEvento}</div>
+                    <small style="color: #6c757d;">${cot.cliente.horaEvento}</small>
+                </td>
+                <td style="padding: 15px; text-align: center; font-weight: 600;">${cot.cliente.cantidadPersonas}</td>
+                <td style="padding: 15px; text-align: center;">
+                    <div style="font-weight: 700; font-size: 1.1rem; color: #28a745;">$${cot.totales.subtotal.toFixed(2)}</div>
+                    <small style="color: #6c757d;">Margen: ${cot.totales.porcentajeMargen}%</small>
+                </td>
+                <td style="padding: 15px; text-align: center;">
+                    <span style="background: #667eea; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem;">
+                        ${totalProductos} items
+                    </span>
+                </td>
+                <td style="padding: 15px; text-align: center; color: #6c757d; font-size: 0.9rem;">
+                    ${cot.fechaCotizacion}
+                </td>
+                <td style="padding: 15px; text-align: center;">
+                    <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
+                        <button class="btn" onclick="verDetalleCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">👁️ Ver</button>
+                        <button class="btn btn-warning" onclick="editarCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">✏️ Editar</button>
+                        <button class="btn" onclick="mostrarHistorialVersiones(${cot.id})" style="font-size: 0.8rem; padding: 6px 10px; background: #28a745; color: white;">🔄 Versiones</button>
+                        <button class="btn" onclick="duplicarCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">📋 Duplicar</button>
+                        <button class="btn" onclick="descargarCotizacionIndividual(${index})" style="font-size: 0.8rem; padding: 6px 10px;">💾 Descargar</button>
+                        <button class="btn btn-danger" onclick="eliminarCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">🗑️</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 10px; text-align: center;">
+            <strong>📊 Resumen:</strong> 
+            ${cotizaciones.length} cotizaciones | 
+            Total facturado: $${cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0).toFixed(2)} |
+            Promedio por cotización: $${cotizaciones.length > 0 ? (cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0) / cotizaciones.length).toFixed(2) : '0.00'}
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function verDetalleCotizacion(index) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const cot = cotizaciones[index];
+    
+    if (!cot) return;
+
+    // Crear modal o ventana con detalles
+    const modalHtml = `
+        <div id="modalDetalle" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center;" onclick="cerrarModal()">
+            <div style="background: white; border-radius: 15px; padding: 30px; max-width: 800px; max-height: 90vh; overflow-y: auto; margin: 20px;" onclick="event.stopPropagation()">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #667eea; padding-bottom: 15px;">
+                    <h3 style="color: #667eea; margin: 0;">📋 Detalle de Cotización</h3>
+                    <button onclick="cerrarModal()" style="background: #dc3545; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <strong>Cliente:</strong><br>${cot.cliente.nombre}
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <strong>Fecha:</strong><br>${cot.cliente.fechaEvento} ${cot.cliente.horaEvento}
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <strong>Personas:</strong><br>${cot.cliente.cantidadPersonas} (${cot.cliente.formatoEvento})
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <strong>Total:</strong><br><span style="color: #28a745; font-weight: 700; font-size: 1.2rem;">$${cot.totales.subtotal.toFixed(2)}</span>
+                    </div>
+                </div>
+
+                <h4 style="color: #2c3e50; margin-bottom: 15px;">Productos:</h4>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Producto</th>
+                            <th style="padding: 10px; text-align: center; border-bottom: 2px solid #dee2e6;">Precio</th>
+                            <th style="padding: 10px; text-align: center; border-bottom: 2px solid #dee2e6;">Cantidad</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${cot.productos.map(p => `
+                            <tr>
+                                <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">${p.nombre}</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">$${p.precio.toFixed(2)}</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">${p.cantidad}</td>
+                                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #dee2e6; font-weight: 600;">$${p.subtotal.toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px;">
+                    <div style="text-align: center; padding: 15px; background: #fff3cd; border-radius: 10px;">
+                        <div style="font-size: 0.9rem; color: #856404;">Costo Total</div>
+                        <div style="font-size: 1.3rem; font-weight: 600; color: #856404;">$${cot.totales.costoTotal.toFixed(2)}</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #d1ecf1; border-radius: 10px;">
+                        <div style="font-size: 0.9rem; color: #0c5460;">Margen</div>
+                        <div style="font-size: 1.3rem; font-weight: 600; color: #0c5460;">$${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #d4edda; border-radius: 10px;">
+                        <div style="font-size: 0.9rem; color: #155724;">Total</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #155724;">$${cot.totales.subtotal.toFixed(2)}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function cerrarModal() {
+    const modal = document.getElementById('modalDetalle');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function editarCotizacion(index) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const cot = cotizaciones[index];
+    
+    if (!cot) return;
+
+    // Cambiar a la tab del cotizador
+    showTab('cotizador');
+    
+    // Primero limpiar completamente el formulario sin confirmación
+    limpiarCotizacion(true);
+    
+    // Esperar a que se complete la limpieza
+    setTimeout(() => {
+        // Cargar los datos básicos en el formulario
+        document.getElementById('nombreCliente').value = cot.cliente.nombre;
+        document.getElementById('cantidadPersonas').value = cot.cliente.cantidadPersonas;
+        document.getElementById('formatoEvento').value = cot.cliente.formatoEvento;
+        
+        // Cargar estado si existe
+        if (cot.estado && document.getElementById('estadoCotizacion')) {
+            document.getElementById('estadoCotizacion').value = cot.estado;
+        }
+        
+        // Cargar fecha del evento
+        if (cot.cliente.fechaEventoOriginal) {
+            document.getElementById('fechaEvento').value = cot.cliente.fechaEventoOriginal;
+        } else {
+            // Fallback para cotizaciones antiguas
+            try {
+                const fechaParts = cot.cliente.fechaEvento.split('/');
+                const horaParts = cot.cliente.horaEvento.split(':');
+                
+                if (fechaParts.length === 3 && horaParts.length >= 2) {
+                    const dia = fechaParts[0].padStart(2, '0');
+                    const mes = fechaParts[1].padStart(2, '0');
+                    const año = fechaParts[2];
+                    const hora = horaParts[0].padStart(2, '0');
+                    const minuto = horaParts[1].padStart(2, '0');
+                    
+                    const fechaISO = `${año}-${mes}-${dia}T${hora}:${minuto}`;
+                    document.getElementById('fechaEvento').value = fechaISO;
+                }
+            } catch (error) {
+                console.warn('Error al convertir fecha:', error);
+            }
+        }
+
+        // Limpiar selecciones previas
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+            cb.closest('.checkbox-item')?.classList.remove('selected');
+        });
+
+        // Marcar motivos
+        if (cot.motivos && cot.motivos.length > 0) {
+            cot.motivos.forEach(motivo => {
+                const checkbox = document.querySelector(`input[name="motivo"][value="${motivo}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    checkbox.closest('.checkbox-item')?.classList.add('selected');
+                }
+            });
+        }
+
+        // Marcar experiencias
+        if (cot.experiencias && cot.experiencias.length > 0) {
+            cot.experiencias.forEach(experiencia => {
+                const checkbox = document.querySelector(`input[name="experiencia"][value="${experiencia}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    checkbox.closest('.checkbox-item')?.classList.add('selected');
+                }
+            });
+        }
+
+        // Esperar otro momento para cargar productos
+        setTimeout(() => {
+            // Seleccionar productos que aún existen
+            if (cot.productos && cot.productos.length > 0) {
+                cot.productos.forEach(prod => {
+                    const checkbox = document.getElementById(`producto_${prod.id}`);
+                    const cantidadInput = document.getElementById(`cantidad_${prod.id}`);
+                    
+                    if (checkbox && cantidadInput) {
+                        checkbox.checked = true;
+                        cantidadInput.disabled = false;
+                        cantidadInput.value = prod.cantidad;
+                        calcularTotalProducto(prod.id);
+                    } else {
+                        console.warn(`Producto con ID ${prod.id} no encontrado - posiblemente fue eliminado`);
+                    }
+                });
+            }
+
+            validarTotalesProductos();
+            // Actualizar resumen después de cargar todos los datos
+            actualizarResumenTiempoReal();
+        }, 200);
+    }, 200);
+
+    // Entrar en modo edición DESPUÉS de cargar todos los datos
+    entrarModoEdicion(cot);
+    
+    mostrarAlerta('alertCotizacion', 'Cotización cargada para edición. Al guardar se creará una nueva versión.', 'success');
+}
+
+function duplicarCotizacion(index) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const cot = cotizaciones[index];
+    
+    if (!cot) return;
+
+    const nuevaCotizacion = copiarProfundo(cot);
+    nuevaCotizacion.id = Date.now();
+    nuevaCotizacion.fechaCotizacion = new Date().toLocaleDateString();
+    nuevaCotizacion.cliente = {
+        ...nuevaCotizacion.cliente,
+        nombre: nuevaCotizacion.cliente.nombre + ' (Copia)'
+    };
+
+    cotizaciones.push(nuevaCotizacion);
+    localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
+    cargarHistorialCotizaciones();
+    
+    mostrarAlerta('alertHistorial', 'Cotización duplicada exitosamente.', 'success');
+}
+
+function descargarCotizacionIndividual(index) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const cot = cotizaciones[index];
+    
+    if (!cot) return;
+
+    cotizacionActual = cot;
+    descargarCotizacion();
+}
+
+function eliminarCotizacion(index) {
+    if (confirm('¿Estás seguro de eliminar esta cotización? Esta acción no se puede deshacer.')) {
+        const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+        cotizaciones.splice(index, 1);
+        localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
+        cargarHistorialCotizaciones();
+        mostrarAlerta('alertHistorial', 'Cotización eliminada.', 'success');
+    }
+}
+
+function exportarCotizaciones() {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    
+    if (cotizaciones.length === 0) {
+        mostrarAlerta('alertHistorial', 'No hay cotizaciones para exportar.', 'error');
+        return;
+    }
+
+    let contenido = `REPORTE COMPLETO DE COTIZACIONES\n`;
+    contenido += `================================\n\n`;
+    contenido += `Fecha de exportación: ${new Date().toLocaleDateString()}\n`;
+    contenido += `Total de cotizaciones: ${cotizaciones.length}\n\n`;
+
+    cotizaciones.forEach((cot, index) => {
+        contenido += `COTIZACIÓN #${index + 1}\n`;
+        contenido += `================\n`;
+        contenido += `Cliente: ${cot.cliente.nombre}\n`;
+        contenido += `Fecha del Evento: ${cot.cliente.fechaEvento} ${cot.cliente.horaEvento}\n`;
+        contenido += `Personas: ${cot.cliente.cantidadPersonas} (${cot.cliente.formatoEvento})\n`;
+        contenido += `Total: $${cot.totales.subtotal.toFixed(2)}\n`;
+        contenido += `Margen: $${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)\n`;
+        contenido += `Productos:\n`;
+        cot.productos.forEach(p => {
+            contenido += `  - ${p.nombre}: ${p.cantidad} x $${p.precio.toFixed(2)} = $${p.subtotal.toFixed(2)}\n`;
+        });
+        contenido += `Fecha de cotización: ${cot.fechaCotizacion}\n\n`;
+    });
+
+    const totalFacturado = cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0);
+    const promedioFacturado = totalFacturado / cotizaciones.length;
+
+    contenido += `RESUMEN GENERAL:\n`;
+    contenido += `================\n`;
+    contenido += `Total facturado: $${totalFacturado.toFixed(2)}\n`;
+    contenido += `Promedio por cotización: $${promedioFacturado.toFixed(2)}\n`;
+
+    const blob = new Blob([contenido], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reporte_cotizaciones_${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    mostrarAlerta('alertHistorial', 'Reporte exportado exitosamente.', 'success');
+}
+
+function limpiarHistorial() {
+    if (confirm('¿Estás seguro de eliminar TODAS las cotizaciones? Esta acción no se puede deshacer.')) {
+        localStorage.removeItem('cotizaciones');
+        cargarHistorialCotizaciones();
+        mostrarAlerta('alertHistorial', 'Historial limpiado completamente.', 'success');
+    }
+}
+
+function exportarBaseDatos() {
+    const productos = JSON.parse(localStorage.getItem('productos') || '[]');
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
+    const categorias = JSON.parse(localStorage.getItem('categorias') || '[]');
+    const estadosCotizacion = JSON.parse(localStorage.getItem('estadosCotizacion') || '[]');
+    
+    const baseDatos = {
+        productos: productos,
+        cotizaciones: cotizaciones,
+        categorias: categorias,
+        estadosCotizacion: estadosCotizacion,
+        fechaExportacion: new Date().toISOString(),
+        version: '2.0'
+    };
+    
+    const contenidoJSON = JSON.stringify(baseDatos, null, 2);
+    
+    const blob = new Blob([contenidoJSON], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `base_datos_cotizador_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    mostrarAlerta('alertHistorial', `Base de datos exportada: ${productos.length} productos, ${cotizaciones.length} cotizaciones, ${categorias.length} categorías y ${estadosCotizacion.length} estados.`, 'success');
+}
+
+function importarBaseDatos() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const baseDatos = JSON.parse(e.target.result);
+                
+                if (!baseDatos.productos || !baseDatos.cotizaciones) {
+                    throw new Error('Formato de archivo inválido');
+                }
+                
+                if (confirm(`¿Estás seguro de importar esta base de datos?\nProductos: ${baseDatos.productos.length}\nCotizaciones: ${baseDatos.cotizaciones.length}\nCategorías: ${baseDatos.categorias?.length || 0}\nEstados: ${baseDatos.estadosCotizacion?.length || 0}\n\nEsto REEMPLAZARÁ todos los datos actuales.`)) {
+                    localStorage.setItem('productos', JSON.stringify(baseDatos.productos));
+                    localStorage.setItem('cotizaciones', JSON.stringify(baseDatos.cotizaciones));
+                    
+                    // Importar categorías y estados si existen
+                    if (baseDatos.categorias) {
+                        localStorage.setItem('categorias', JSON.stringify(baseDatos.categorias));
+                    }
+                    if (baseDatos.estadosCotizacion) {
+                        localStorage.setItem('estadosCotizacion', JSON.stringify(baseDatos.estadosCotizacion));
+                    }
+                    
+                    // Actualizar las variables globales
+                    productos = baseDatos.productos;
+                    if (baseDatos.categorias) {
+                        categorias = baseDatos.categorias;
+                    }
+                    if (baseDatos.estadosCotizacion) {
+                        estadosCotizacion = baseDatos.estadosCotizacion;
+                    }
+                    
+                    // Actualizar todas las vistas
+                    actualizarSelectCategorias();
+                    actualizarSelectEstados();
+                    actualizarListaCategorias();
+                    actualizarListaEstados();
+                    actualizarListaProductos();
+                    actualizarMenuSelector();
+                    cargarHistorialCotizaciones();
+                    
+                    mostrarAlerta('alertHistorial', `Base de datos importada exitosamente: ${baseDatos.productos.length} productos, ${baseDatos.cotizaciones.length} cotizaciones, ${baseDatos.categorias?.length || 0} categorías y ${baseDatos.estadosCotizacion?.length || 0} estados.`, 'success');
+                }
+            } catch (error) {
+                mostrarAlerta('alertHistorial', 'Error al importar: archivo inválido o corrupto.', 'error');
+                console.error('Error de importación:', error);
+            }
+        };
+        reader.readAsText(file);
+    };
+    
+    input.click();
+}
+
+// FUNCIONES DEL SISTEMA DE VERSIONES
 function mostrarHistorialVersiones(cotizacionId) {
     const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
     const cotizacion = cotizaciones.find(cot => cot.id === cotizacionId);
@@ -2122,603 +2825,4 @@ function crearRamaDesdeVersion(cotizacionId, numeroVersion) {
     mostrarResumenCotizacion();
     
     mostrarAlerta('alertCotizacion', `Rama creada desde versión ${numeroVersion}. Puedes modificar y guardar como nueva cotización.`, 'success');
-}
-
-function descargarCotizacion() {
-    if (!cotizacionActual.id) {
-        mostrarAlerta('alertCotizacion', 'No hay cotización para descargar.', 'error');
-        return;
-    }
-
-    // Crear contenido del archivo
-    let contenido = `COTIZACIÓN DE EVENTO GASTRONÓMICO\n`;
-    contenido += `===============================\n\n`;
-    contenido += `Cliente: ${cotizacionActual.cliente.nombre}\n`;
-    contenido += `Fecha del Evento: ${cotizacionActual.cliente.fechaEvento}\n`;
-    contenido += `Hora: ${cotizacionActual.cliente.horaEvento}\n`;
-    contenido += `Cantidad de Personas: ${cotizacionActual.cliente.cantidadPersonas} (${cotizacionActual.cliente.formatoEvento})\n\n`;
-
-    if (cotizacionActual.motivos.length > 0) {
-        contenido += `Motivo del Evento:\n`;
-        cotizacionActual.motivos.forEach(motivo => {
-            contenido += `- ${motivo}\n`;
-        });
-        contenido += `\n`;
-    }
-
-    if (cotizacionActual.experiencias.length > 0) {
-        contenido += `Experiencias Seleccionadas:\n`;
-        cotizacionActual.experiencias.forEach(exp => {
-            contenido += `- ${exp}\n`;
-        });
-        contenido += `\n`;
-    }
-
-    contenido += `DETALLE DEL MENÚ:\n`;
-    contenido += `=================\n`;
-    cotizacionActual.productos.forEach(producto => {
-        contenido += `${producto.nombre}\n`;
-        contenido += `  Precio unitario: $${producto.precio.toFixed(2)}\n`;
-        contenido += `  Cantidad: ${producto.cantidad}\n`;
-        contenido += `  Subtotal: $${producto.subtotal.toFixed(2)}\n\n`;
-    });
-
-    contenido += `RESUMEN FINANCIERO:\n`;
-    contenido += `===================\n`;
-    contenido += `Costo Total: $${cotizacionActual.totales.costoTotal.toFixed(2)}\n`;
-    contenido += `Margen: $${cotizacionActual.totales.margenTotal.toFixed(2)} (${cotizacionActual.totales.porcentajeMargen}%)\n`;
-    contenido += `TOTAL: $${cotizacionActual.totales.subtotal.toFixed(2)}\n\n`;
-    contenido += `Cotización generada el: ${cotizacionActual.fechaCotizacion}\n`;
-
-    // Descargar archivo
-    const blob = new Blob([contenido], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cotizacion_${cotizacionActual.cliente.nombre.replace(/\s+/g, '_')}_${Date.now()}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    mostrarAlerta('alertCotizacion', 'Cotización descargada exitosamente.', 'success');
-}
-
-function mostrarAlerta(containerId, mensaje, tipo) {
-    const container = document.getElementById(containerId);
-    const alertClass = tipo === 'success' ? 'alert-success' : 'alert-error';
-    
-    container.innerHTML = `
-        <div class="alert ${alertClass}">
-            ${mensaje}
-        </div>
-    `;
-
-    setTimeout(() => {
-        container.innerHTML = '';
-    }, 5000);
-}
-
-// Inicializar la aplicación
-document.addEventListener('DOMContentLoaded', function() {
-    cargarCategorias();
-    cargarEstados();
-    cargarProductos();
-    actualizarSelectCategorias();
-    actualizarSelectEstados();
-    actualizarListaCategorias();
-    actualizarListaEstados();
-    actualizarListaProductos();
-    actualizarMenuSelector();
-    cargarHistorialCotizaciones();
-    
-    // Inicializar historial de versiones
-    const historialVersiones = document.getElementById('historialVersiones');
-    if (historialVersiones) {
-        historialVersiones.innerHTML = '<p style="text-align: center; color: #6c757d; font-style: italic;">Selecciona una cotización de la tabla para ver su historial de versiones.</p>';
-    }
-});
-
-// GESTIÓN DEL HISTORIAL DE COTIZACIONES
-function cargarHistorialCotizaciones() {
-    mostrarTodasCotizaciones();
-}
-
-function mostrarTodasCotizaciones() {
-    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-    mostrarCotizacionesEnTabla(cotizaciones);
-}
-
-function buscarCotizaciones() {
-    const termino = document.getElementById('buscarCotizacion').value.toLowerCase();
-    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-    
-    const cotizacionesFiltradas = cotizaciones.filter(cot => 
-        cot.cliente.nombre.toLowerCase().includes(termino) ||
-        cot.cliente.fechaEvento.includes(termino) ||
-        cot.fechaCotizacion.includes(termino)
-    );
-    
-    mostrarCotizacionesEnTabla(cotizacionesFiltradas);
-}
-
-function mostrarCotizacionesEnTabla(cotizaciones) {
-    const container = document.getElementById('tablaCotizaciones');
-    
-    if (cotizaciones.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 40px; color: #6c757d;">
-                <h3>📋 No hay cotizaciones guardadas</h3>
-                <p>Las cotizaciones que generes y guardes aparecerán aquí.</p>
-            </div>
-        `;
-        return;
-    }
-
-    let html = `
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
-                <thead>
-                    <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                        <th style="padding: 15px; text-align: left;">Cliente</th>
-                        <th style="padding: 15px; text-align: center;">Estado</th>
-                        <th style="padding: 15px; text-align: center;">Fecha Evento</th>
-                        <th style="padding: 15px; text-align: center;">Personas</th>
-                        <th style="padding: 15px; text-align: center;">Total</th>
-                        <th style="padding: 15px; text-align: center;">Productos</th>
-                        <th style="padding: 15px; text-align: center;">Fecha Cotización</th>
-                        <th style="padding: 15px; text-align: center;">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-
-    cotizaciones.forEach((cot, index) => {
-        const totalProductos = cot.productos.length;
-        const fechaClass = new Date(cot.cliente.fechaEvento) < new Date() ? 'color: #dc3545;' : 'color: #28a745;';
-        
-        // Obtener información del estado
-        const estadoCotizacion = estadosCotizacion.find(est => est.id === cot.estado) || { nombre: 'Sin estado', icono: '❓', color: '#6c757d' };
-        
-        html += `
-            <tr style="border-bottom: 1px solid #dee2e6; transition: background-color 0.3s ease;" 
-                onmouseover="this.style.backgroundColor='#f8f9fa'" 
-                onmouseout="this.style.backgroundColor='white'">
-                <td style="padding: 15px;">
-                    <strong style="${fechaClass}">${cot.cliente.nombre}</strong>
-                    <br><small style="color: #6c757d;">${cot.cliente.formatoEvento}</small>
-                </td>
-                <td style="padding: 15px; text-align: center;">
-                    <div style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; background: ${estadoCotizacion.color}15; color: ${estadoCotizacion.color}; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
-                        <span>${estadoCotizacion.icono}</span>
-                        <span>${estadoCotizacion.nombre}</span>
-                    </div>
-                </td>
-                <td style="padding: 15px; text-align: center;">
-                    <div>${cot.cliente.fechaEvento}</div>
-                    <small style="color: #6c757d;">${cot.cliente.horaEvento}</small>
-                </td>
-                <td style="padding: 15px; text-align: center; font-weight: 600;">${cot.cliente.cantidadPersonas}</td>
-                <td style="padding: 15px; text-align: center;">
-                    <div style="font-weight: 700; font-size: 1.1rem; color: #28a745;">$${cot.totales.subtotal.toFixed(2)}</div>
-                    <small style="color: #6c757d;">Margen: ${cot.totales.porcentajeMargen}%</small>
-                </td>
-                <td style="padding: 15px; text-align: center;">
-                    <span style="background: #667eea; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.85rem;">
-                        ${totalProductos} items
-                    </span>
-                </td>
-                <td style="padding: 15px; text-align: center; color: #6c757d; font-size: 0.9rem;">
-                    ${cot.fechaCotizacion}
-                </td>
-                <td style="padding: 15px; text-align: center;">
-                    <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
-                        <button class="btn" onclick="verDetalleCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">👁️ Ver</button>
-                        <button class="btn btn-warning" onclick="editarCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">✏️ Editar</button>
-                        <button class="btn" onclick="mostrarHistorialVersiones(${cot.id})" style="font-size: 0.8rem; padding: 6px 10px; background: #28a745; color: white;">🔄 Versiones</button>
-                        <button class="btn" onclick="duplicarCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">📋 Duplicar</button>
-                        <button class="btn" onclick="descargarCotizacionIndividual(${index})" style="font-size: 0.8rem; padding: 6px 10px;">💾 Descargar</button>
-                        <button class="btn btn-danger" onclick="eliminarCotizacion(${index})" style="font-size: 0.8rem; padding: 6px 10px;">🗑️</button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    });
-
-    html += `
-                </tbody>
-            </table>
-        </div>
-        
-        <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 10px; text-align: center;">
-            <strong>📊 Resumen:</strong> 
-            ${cotizaciones.length} cotizaciones | 
-            Total facturado: $${cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0).toFixed(2)} |
-            Promedio por cotización: $${cotizaciones.length > 0 ? (cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0) / cotizaciones.length).toFixed(2) : '0.00'}
-        </div>
-    `;
-
-    container.innerHTML = html;
-}
-
-function verDetalleCotizacion(index) {
-    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-    const cot = cotizaciones[index];
-    
-    if (!cot) return;
-
-    // Crear modal o ventana con detalles
-    const modalHtml = `
-        <div id="modalDetalle" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center;" onclick="cerrarModal()">
-            <div style="background: white; border-radius: 15px; padding: 30px; max-width: 800px; max-height: 90vh; overflow-y: auto; margin: 20px;" onclick="event.stopPropagation()">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #667eea; padding-bottom: 15px;">
-                    <h3 style="color: #667eea; margin: 0;">📋 Detalle de Cotización</h3>
-                    <button onclick="cerrarModal()" style="background: #dc3545; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
-                        <strong>Cliente:</strong><br>${cot.cliente.nombre}
-                    </div>
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
-                        <strong>Fecha:</strong><br>${cot.cliente.fechaEvento} ${cot.cliente.horaEvento}
-                    </div>
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
-                        <strong>Personas:</strong><br>${cot.cliente.cantidadPersonas} (${cot.cliente.formatoEvento})
-                    </div>
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
-                        <strong>Total:</strong><br><span style="color: #28a745; font-weight: 700; font-size: 1.2rem;">$${cot.totales.subtotal.toFixed(2)}</span>
-                    </div>
-                </div>
-
-                <h4 style="color: #2c3e50; margin-bottom: 15px;">Productos:</h4>
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                    <thead>
-                        <tr style="background: #f8f9fa;">
-                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Producto</th>
-                            <th style="padding: 10px; text-align: center; border-bottom: 2px solid #dee2e6;">Precio</th>
-                            <th style="padding: 10px; text-align: center; border-bottom: 2px solid #dee2e6;">Cantidad</th>
-                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${cot.productos.map(p => `
-                            <tr>
-                                <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">${p.nombre}</td>
-                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">$${p.precio.toFixed(2)}</td>
-                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">${p.cantidad}</td>
-                                <td style="padding: 10px; text-align: right; border-bottom: 1px solid #dee2e6; font-weight: 600;">$${p.subtotal.toFixed(2)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px;">
-                    <div style="text-align: center; padding: 15px; background: #fff3cd; border-radius: 10px;">
-                        <div style="font-size: 0.9rem; color: #856404;">Costo Total</div>
-                        <div style="font-size: 1.3rem; font-weight: 600; color: #856404;">$${cot.totales.costoTotal.toFixed(2)}</div>
-                    </div>
-                    <div style="text-align: center; padding: 15px; background: #d1ecf1; border-radius: 10px;">
-                        <div style="font-size: 0.9rem; color: #0c5460;">Margen</div>
-                        <div style="font-size: 1.3rem; font-weight: 600; color: #0c5460;">$${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)</div>
-                    </div>
-                    <div style="text-align: center; padding: 15px; background: #d4edda; border-radius: 10px;">
-                        <div style="font-size: 0.9rem; color: #155724;">Total</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #155724;">$${cot.totales.subtotal.toFixed(2)}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-}
-
-function cerrarModal() {
-    const modal = document.getElementById('modalDetalle');
-    if (modal) {
-        modal.remove();
-    }
-}
-
-function editarCotizacion(index) {
-    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-    const cot = cotizaciones[index];
-    
-    if (!cot) return;
-
-    // Cambiar a la tab del cotizador
-    showTab('cotizador');
-    
-    // Primero limpiar completamente el formulario sin confirmación
-    limpiarCotizacion(true);
-    
-    // Esperar a que se complete la limpieza
-    setTimeout(() => {
-        // Cargar los datos básicos en el formulario
-        document.getElementById('nombreCliente').value = cot.cliente.nombre;
-        document.getElementById('cantidadPersonas').value = cot.cliente.cantidadPersonas;
-        document.getElementById('formatoEvento').value = cot.cliente.formatoEvento;
-        
-        // Cargar estado si existe
-        if (cot.estado && document.getElementById('estadoCotizacion')) {
-            document.getElementById('estadoCotizacion').value = cot.estado;
-        }
-        
-        // Cargar fecha del evento
-        if (cot.cliente.fechaEventoOriginal) {
-            // Usar la fecha original en formato datetime-local
-            document.getElementById('fechaEvento').value = cot.cliente.fechaEventoOriginal;
-        } else {
-            // Fallback para cotizaciones antiguas - intentar reconstruir
-            try {
-                // Convertir de formato local de vuelta a datetime-local
-                const fechaParts = cot.cliente.fechaEvento.split('/'); // dd/mm/yyyy
-                const horaParts = cot.cliente.horaEvento.split(':'); // hh:mm:ss
-                
-                if (fechaParts.length === 3 && horaParts.length >= 2) {
-                    const dia = fechaParts[0].padStart(2, '0');
-                    const mes = fechaParts[1].padStart(2, '0');
-                    const año = fechaParts[2];
-                    const hora = horaParts[0].padStart(2, '0');
-                    const minuto = horaParts[1].padStart(2, '0');
-                    
-                    const fechaISO = `${año}-${mes}-${dia}T${hora}:${minuto}`;
-                    document.getElementById('fechaEvento').value = fechaISO;
-                }
-            } catch (error) {
-                console.warn('Error al convertir fecha:', error);
-            }
-        }
-
-        // Limpiar selecciones previas
-        document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-            cb.checked = false;
-            cb.closest('.checkbox-item')?.classList.remove('selected');
-        });
-
-        // Marcar motivos
-        if (cot.motivos && cot.motivos.length > 0) {
-            cot.motivos.forEach(motivo => {
-                const checkbox = document.querySelector(`input[name="motivo"][value="${motivo}"]`);
-                if (checkbox) {
-                    checkbox.checked = true;
-                    checkbox.closest('.checkbox-item')?.classList.add('selected');
-                }
-            });
-        }
-
-        // Marcar experiencias
-        if (cot.experiencias && cot.experiencias.length > 0) {
-            cot.experiencias.forEach(experiencia => {
-                const checkbox = document.querySelector(`input[name="experiencia"][value="${experiencia}"]`);
-                if (checkbox) {
-                    checkbox.checked = true;
-                    checkbox.closest('.checkbox-item')?.classList.add('selected');
-                }
-            });
-        }
-
-        // Esperar otro momento para cargar productos
-        setTimeout(() => {
-            // Seleccionar productos que aún existen
-            if (cot.productos && cot.productos.length > 0) {
-                cot.productos.forEach(prod => {
-                    const checkbox = document.getElementById(`producto_${prod.id}`);
-                    const cantidadInput = document.getElementById(`cantidad_${prod.id}`);
-                    
-                    if (checkbox && cantidadInput) {
-                        checkbox.checked = true;
-                        cantidadInput.disabled = false;
-                        cantidadInput.value = prod.cantidad;
-                        calcularTotalProducto(prod.id);
-                    } else {
-                        console.warn(`Producto con ID ${prod.id} no encontrado - posiblemente fue eliminado`);
-                    }
-                });
-            }
-
-            validarTotalesProductos();
-        }, 200);
-    }, 200);
-
-    // Entrar en modo edición DESPUÉS de cargar todos los datos
-    entrarModoEdicion(cot);
-    
-    // NO eliminar la cotización original, solo marcarla como en edición
-    // Se creará una nueva versión al guardar
-    
-    mostrarAlerta('alertCotizacion', 'Cotización cargada para edición. Al guardar se creará una nueva versión.', 'success');
-}
-
-function duplicarCotizacion(index) {
-    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-    const cot = cotizaciones[index];
-    
-    if (!cot) return;
-
-    // Usar copiarProfundo para evitar referencias
-    const nuevaCotizacion = copiarProfundo(cot);
-    nuevaCotizacion.id = Date.now();
-    nuevaCotizacion.fechaCotizacion = new Date().toLocaleDateString();
-    nuevaCotizacion.cliente = {
-        ...nuevaCotizacion.cliente,
-        nombre: nuevaCotizacion.cliente.nombre + ' (Copia)'
-    };
-
-    cotizaciones.push(nuevaCotizacion);
-    localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
-    cargarHistorialCotizaciones();
-    
-    mostrarAlerta('alertHistorial', 'Cotización duplicada exitosamente.', 'success');
-}
-
-function descargarCotizacionIndividual(index) {
-    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-    const cot = cotizaciones[index];
-    
-    if (!cot) return;
-
-    // Usar la misma lógica de descarga pero con la cotización del historial
-    cotizacionActual = cot;
-    descargarCotizacion();
-}
-
-function eliminarCotizacion(index) {
-    if (confirm('¿Estás seguro de eliminar esta cotización? Esta acción no se puede deshacer.')) {
-        const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-        cotizaciones.splice(index, 1);
-        localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
-        cargarHistorialCotizaciones();
-        mostrarAlerta('alertHistorial', 'Cotización eliminada.', 'success');
-    }
-}
-
-function exportarCotizaciones() {
-    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-    
-    if (cotizaciones.length === 0) {
-        mostrarAlerta('alertHistorial', 'No hay cotizaciones para exportar.', 'error');
-        return;
-    }
-
-    let contenido = `REPORTE COMPLETO DE COTIZACIONES\n`;
-    contenido += `================================\n\n`;
-    contenido += `Fecha de exportación: ${new Date().toLocaleDateString()}\n`;
-    contenido += `Total de cotizaciones: ${cotizaciones.length}\n\n`;
-
-    cotizaciones.forEach((cot, index) => {
-        contenido += `COTIZACIÓN #${index + 1}\n`;
-        contenido += `================\n`;
-        contenido += `Cliente: ${cot.cliente.nombre}\n`;
-        contenido += `Fecha del Evento: ${cot.cliente.fechaEvento} ${cot.cliente.horaEvento}\n`;
-        contenido += `Personas: ${cot.cliente.cantidadPersonas} (${cot.cliente.formatoEvento})\n`;
-        contenido += `Total: $${cot.totales.subtotal.toFixed(2)}\n`;
-        contenido += `Margen: $${cot.totales.margenTotal.toFixed(2)} (${cot.totales.porcentajeMargen}%)\n`;
-        contenido += `Productos:\n`;
-        cot.productos.forEach(p => {
-            contenido += `  - ${p.nombre}: ${p.cantidad} x $${p.precio.toFixed(2)} = $${p.subtotal.toFixed(2)}\n`;
-        });
-        contenido += `Fecha de cotización: ${cot.fechaCotizacion}\n\n`;
-    });
-
-    const totalFacturado = cotizaciones.reduce((sum, cot) => sum + cot.totales.subtotal, 0);
-    const promedioFacturado = totalFacturado / cotizaciones.length;
-
-    contenido += `RESUMEN GENERAL:\n`;
-    contenido += `================\n`;
-    contenido += `Total facturado: $${totalFacturado.toFixed(2)}\n`;
-    contenido += `Promedio por cotización: $${promedioFacturado.toFixed(2)}\n`;
-
-    // Descargar archivo
-    const blob = new Blob([contenido], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `reporte_cotizaciones_${Date.now()}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    mostrarAlerta('alertHistorial', 'Reporte exportado exitosamente.', 'success');
-}
-
-function limpiarHistorial() {
-    if (confirm('¿Estás seguro de eliminar TODAS las cotizaciones? Esta acción no se puede deshacer.')) {
-        localStorage.removeItem('cotizaciones');
-        cargarHistorialCotizaciones();
-        mostrarAlerta('alertHistorial', 'Historial limpiado completamente.', 'success');
-    }
-}
-
-function exportarBaseDatos() {
-    const productos = JSON.parse(localStorage.getItem('productos') || '[]');
-    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
-    const categorias = JSON.parse(localStorage.getItem('categorias') || '[]');
-    const estadosCotizacion = JSON.parse(localStorage.getItem('estadosCotizacion') || '[]');
-    
-    const baseDatos = {
-        productos: productos,
-        cotizaciones: cotizaciones,
-        categorias: categorias,
-        estadosCotizacion: estadosCotizacion,
-        fechaExportacion: new Date().toISOString(),
-        version: '2.0'
-    };
-    
-    const contenidoJSON = JSON.stringify(baseDatos, null, 2);
-    
-    const blob = new Blob([contenidoJSON], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `base_datos_cotizador_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    mostrarAlerta('alertHistorial', `Base de datos exportada: ${productos.length} productos, ${cotizaciones.length} cotizaciones, ${categorias.length} categorías y ${estadosCotizacion.length} estados.`, 'success');
-}
-
-function importarBaseDatos() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    
-    input.onchange = function(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const baseDatos = JSON.parse(e.target.result);
-                
-                if (!baseDatos.productos || !baseDatos.cotizaciones) {
-                    throw new Error('Formato de archivo inválido');
-                }
-                
-                if (confirm(`¿Estás seguro de importar esta base de datos?\nProductos: ${baseDatos.productos.length}\nCotizaciones: ${baseDatos.cotizaciones.length}\nCategorías: ${baseDatos.categorias?.length || 0}\nEstados: ${baseDatos.estadosCotizacion?.length || 0}\n\nEsto REEMPLAZARÁ todos los datos actuales.`)) {
-                    localStorage.setItem('productos', JSON.stringify(baseDatos.productos));
-                    localStorage.setItem('cotizaciones', JSON.stringify(baseDatos.cotizaciones));
-                    
-                    // Importar categorías y estados si existen
-                    if (baseDatos.categorias) {
-                        localStorage.setItem('categorias', JSON.stringify(baseDatos.categorias));
-                    }
-                    if (baseDatos.estadosCotizacion) {
-                        localStorage.setItem('estadosCotizacion', JSON.stringify(baseDatos.estadosCotizacion));
-                    }
-                    
-                    // Actualizar las variables globales
-                    productos = baseDatos.productos;
-                    if (baseDatos.categorias) {
-                        categorias = baseDatos.categorias;
-                    }
-                    if (baseDatos.estadosCotizacion) {
-                        estadosCotizacion = baseDatos.estadosCotizacion;
-                    }
-                    
-                    // Actualizar todas las vistas
-                    actualizarSelectCategorias();
-                    actualizarSelectEstados();
-                    actualizarListaCategorias();
-                    actualizarListaEstados();
-                    actualizarListaProductos();
-                    actualizarMenuSelector();
-                    cargarHistorialCotizaciones();
-                    
-                    mostrarAlerta('alertHistorial', `Base de datos importada exitosamente: ${baseDatos.productos.length} productos, ${baseDatos.cotizaciones.length} cotizaciones, ${baseDatos.categorias?.length || 0} categorías y ${baseDatos.estadosCotizacion?.length || 0} estados.`, 'success');
-                }
-            } catch (error) {
-                mostrarAlerta('alertHistorial', 'Error al importar: archivo inválido o corrupto.', 'error');
-                console.error('Error de importación:', error);
-            }
-        };
-        reader.readAsText(file);
-    };
-    
-    input.click();
 }
