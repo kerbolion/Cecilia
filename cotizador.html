@@ -17,6 +17,7 @@
             <button class="tab active" onclick="showTab('productos')">📦 Productos</button>
             <button class="tab" onclick="showTab('cotizador')">💰 Cotizador</button>
             <button class="tab" onclick="showTab('historial')">📋 Historial</button>
+            <button class="tab" onclick="showTab('gestiones')">⚙️ Gestiones</button>
         </div>
 
         <!-- TAB PRODUCTOS -->
@@ -134,94 +135,16 @@
             <!-- Motivo del Evento -->
             <div class="categoria-section">
                 <h3 class="categoria-title">🎉 Motivo del Evento</h3>
-                <div class="checkbox-group">
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="motivo" value="cumpleanos">
-                        <label>🎂 Cumpleaños</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Celebraciones personalizadas para homenajear a quien cumple años.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="motivo" value="celebracion_especial">
-                        <label>✨ Celebración Especial</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Desde encuentros íntimos hasta fiestas sofisticadas.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="motivo" value="aniversarios">
-                        <label>💕 Aniversarios y Bodas</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Momentos románticos para celebrar el amor.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="motivo" value="reunion_familiar">
-                        <label>👨‍👩‍👧‍👦 Reuniones Familiares</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Encuentros intergeneracionales en un entorno cuidado.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="motivo" value="encuentro_amigos">
-                        <label>👥 Encuentro de Amigos</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Reunión distendida con formato relajado.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="motivo" value="corporativo">
-                        <label>🏢 Evento Corporativo</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Para fomentar integración del equipo.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="motivo" value="team_building">
-                        <label>🤝 Team Building</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Espacios de planificación y capacitación.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="motivo" value="comercial">
-                        <label>💼 Evento Comercial</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Presentación de productos o servicios.</p>
-                    </div>
+                <div id="motivosCheckboxGroup" class="checkbox-group">
+                    <!-- Se cargarán dinámicamente desde la gestión -->
                 </div>
             </div>
 
             <!-- Experiencias -->
             <div class="categoria-section">
                 <h3 class="categoria-title">🌟 Experiencias</h3>
-                <div class="checkbox-group">
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="experiencia" value="cena_almuerzo">
-                        <label>🍽️ Cenas/Almuerzo</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Gastronomía de alta cocina con menús de pasos.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="experiencia" value="cena_maridada">
-                        <label>🍷 Cenas Maridadas por Pasos</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Cada plato armonizado con vinos seleccionados.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="experiencia" value="cata_vinos">
-                        <label>🍾 Cata de Vinos</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Degustación guiada de etiquetas seleccionadas.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="experiencia" value="finger_food">
-                        <label>🥂 Finger Food & Lounge</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Formato relajado para socializar con bocados gourmet.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="experiencia" value="after_office">
-                        <label>🌆 After Office</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Veladas con vinos boutique y DJ en vivo.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="experiencia" value="cocteles">
-                        <label>🍸 Cócteles de Autor</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Barra abierta con cócteles preparados por bartenders.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="experiencia" value="show_cooking">
-                        <label>👨‍🍳 Show Cooking</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Chef cocina en vivo frente a los invitados.</p>
-                    </div>
-                    <div class="checkbox-item" onclick="toggleCheckbox(this)">
-                        <input type="checkbox" name="experiencia" value="brunch">
-                        <label>🥞 Brunch</label>
-                        <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">Fusión perfecta entre desayuno y almuerzo.</p>
-                    </div>
+                <div id="experienciasCheckboxGroup" class="checkbox-group">
+                    <!-- Se cargarán dinámicamente desde la gestión -->
                 </div>
             </div>
 
@@ -310,6 +233,114 @@
                 <div id="listaEstados" style="margin-top: 20px;">
                     <!-- Los estados se cargarán aquí -->
                 </div>
+            </div>
+        </div>
+
+        <!-- TAB GESTIONES -->
+        <div id="gestiones" class="tab-content">
+            <h2>Gestión de Datos del Sistema</h2>
+            
+            <!-- Gestión de Experiencias -->
+            <div style="margin-bottom: 40px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #28a745;">
+                <h3 style="color: #28a745; margin-bottom: 20px;">🌟 Gestión de Experiencias</h3>
+                
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="nuevaExperiencia">Nueva Experiencia:</label>
+                        <div style="display: flex; gap: 10px; align-items: end; margin-bottom: 10px;">
+                            <input type="text" id="nuevaExperiencia" placeholder="Nombre de la experiencia" style="flex: 1;">
+                            <input type="text" id="iconoExperiencia" placeholder="🌟" style="width: 60px; text-align: center;" maxlength="2">
+                            <button class="btn" onclick="agregarExperiencia()" style="background: #28a745; color: white;">➕ Agregar</button>
+                        </div>
+                        <textarea id="descripcionExperiencia" rows="2" placeholder="Descripción de la experiencia..." style="width: 100%;"></textarea>
+                        <small style="color: #6c757d; margin-top: 5px; display: block;">Ingresa el nombre, emoji y descripción de la experiencia</small>
+                    </div>
+                </div>
+
+                <div id="alertExperiencias" style="margin: 15px 0;"></div>
+
+                <div id="listaExperiencias" style="margin-top: 20px;">
+                    <!-- Las experiencias se cargarán aquí -->
+                </div>
+            </div>
+
+            <!-- Gestión de Motivos del Evento -->
+            <div style="margin-bottom: 40px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #007bff;">
+                <h3 style="color: #007bff; margin-bottom: 20px;">🎉 Gestión de Motivos del Evento</h3>
+                
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="nuevoMotivo">Nuevo Motivo:</label>
+                        <div style="display: flex; gap: 10px; align-items: end; margin-bottom: 10px;">
+                            <input type="text" id="nuevoMotivo" placeholder="Nombre del motivo" style="flex: 1;">
+                            <input type="text" id="iconoMotivo" placeholder="🎉" style="width: 60px; text-align: center;" maxlength="2">
+                            <button class="btn" onclick="agregarMotivo()" style="background: #007bff; color: white;">➕ Agregar</button>
+                        </div>
+                        <textarea id="descripcionMotivo" rows="2" placeholder="Descripción del motivo..." style="width: 100%;"></textarea>
+                        <small style="color: #6c757d; margin-top: 5px; display: block;">Ingresa el nombre, emoji y descripción del motivo</small>
+                    </div>
+                </div>
+
+                <div id="alertMotivos" style="margin: 15px 0;"></div>
+
+                <div id="listaMotivos" style="margin-top: 20px;">
+                    <!-- Los motivos se cargarán aquí -->
+                </div>
+            </div>
+
+            <!-- Gestión de Políticas -->
+            <div style="margin-bottom: 40px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #dc3545;">
+                <h3 style="color: #dc3545; margin-bottom: 20px;">📋 Gestión de Políticas</h3>
+                
+                <div class="form-group">
+                    <label for="politicas">Políticas de la Empresa:</label>
+                    <textarea id="politicas" rows="8" placeholder="Ingresa las políticas que aparecerán en las cotizaciones..." style="width: 100%;"></textarea>
+                    <small style="color: #6c757d; margin-top: 5px; display: block;">Este texto aparecerá al final de todas las cotizaciones descargadas</small>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="guardarPoliticas()" style="background: #dc3545; color: white;">💾 Guardar Políticas</button>
+                </div>
+
+                <div id="alertPoliticas" style="margin: 15px 0;"></div>
+            </div>
+
+            <!-- Gestión de Plantilla de Descarga -->
+            <div style="margin-bottom: 40px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #6f42c1;">
+                <h3 style="color: #6f42c1; margin-bottom: 20px;">📄 Gestión de Plantilla de Descarga</h3>
+                
+                <div style="margin-bottom: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px; color: #1976d2;">
+                    <strong>💡 Variables disponibles:</strong><br>
+                    <code>[cliente]</code> - Nombre del cliente<br>
+                    <code>[fecha_evento]</code> - Fecha del evento<br>
+                    <code>[hora_evento]</code> - Hora del evento<br>
+                    <code>[personas]</code> - Cantidad de personas<br>
+                    <code>[formato]</code> - Formato del evento<br>
+                    <code>[estado]</code> - Estado de la cotización<br>
+                    <code>[motivos]</code> - Lista de motivos seleccionados<br>
+                    <code>[experiencias]</code> - Lista de experiencias seleccionadas<br>
+                    <code>[productos]</code> - Detalle de productos<br>
+                    <code>[total]</code> - Total de la cotización<br>
+                    <code>[costo_total]</code> - Costo total<br>
+                    <code>[margen]</code> - Margen de ganancia<br>
+                    <code>[porcentaje_margen]</code> - Porcentaje de margen<br>
+                    <code>[fecha_cotizacion]</code> - Fecha de creación<br>
+                    <code>[politicas]</code> - Políticas de la empresa
+                </div>
+                
+                <div class="form-group">
+                    <label for="plantillaDescarga">Plantilla de Descarga:</label>
+                    <textarea id="plantillaDescarga" rows="15" placeholder="Crea tu plantilla personalizada usando las variables..." style="width: 100%; font-family: 'Courier New', monospace;"></textarea>
+                    <small style="color: #6c757d; margin-top: 5px; display: block;">Usa las variables entre corchetes para personalizar la salida</small>
+                </div>
+
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button class="btn" onclick="guardarPlantilla()" style="background: #6f42c1; color: white;">💾 Guardar Plantilla</button>
+                    <button class="btn" onclick="restaurarPlantillaDefecto()" style="background: #6c757d; color: white;">🔄 Restaurar Defecto</button>
+                    <button class="btn" onclick="previsualizarPlantilla()" style="background: #17a2b8; color: white;">👁️ Vista Previa</button>
+                </div>
+
+                <div id="alertPlantilla" style="margin: 15px 0;"></div>
             </div>
         </div>
     </div>

@@ -21,6 +21,32 @@ let estadosCotizacion = [
     { id: 'cancelada', nombre: 'Cancelada', icono: '🚫', color: '#6c757d', orden: 7 }
 ];
 let estadoEnEdicion = null;
+
+// Nuevas variables para las gestiones
+let experiencias = [
+    { id: 'cena_almuerzo', nombre: 'Cenas/Almuerzo', icono: '🍽️', descripcion: 'Gastronomía de alta cocina con menús de pasos.', orden: 1 },
+    { id: 'cena_maridada', nombre: 'Cenas Maridadas por Pasos', icono: '🍷', descripcion: 'Cada plato armonizado con vinos seleccionados.', orden: 2 },
+    { id: 'cata_vinos', nombre: 'Cata de Vinos', icono: '🍾', descripcion: 'Degustación guiada de etiquetas seleccionadas.', orden: 3 },
+    { id: 'finger_food', nombre: 'Finger Food & Lounge', icono: '🥂', descripcion: 'Formato relajado para socializar con bocados gourmet.', orden: 4 },
+    { id: 'after_office', nombre: 'After Office', icono: '🌆', descripcion: 'Veladas con vinos boutique y DJ en vivo.', orden: 5 },
+    { id: 'cocteles', nombre: 'Cócteles de Autor', icono: '🍸', descripcion: 'Barra abierta con cócteles preparados por bartenders.', orden: 6 },
+    { id: 'show_cooking', nombre: 'Show Cooking', icono: '👨‍🍳', descripcion: 'Chef cocina en vivo frente a los invitados.', orden: 7 },
+    { id: 'brunch', nombre: 'Brunch', icono: '🥞', descripcion: 'Fusión perfecta entre desayuno y almuerzo.', orden: 8 }
+];
+let experienciaEnEdicion = null;
+
+let motivosEvento = [
+    { id: 'cumpleanos', nombre: 'Cumpleaños', icono: '🎂', descripcion: 'Celebraciones personalizadas para homenajear a quien cumple años.', orden: 1 },
+    { id: 'celebracion_especial', nombre: 'Celebración Especial', icono: '✨', descripcion: 'Desde encuentros íntimos hasta fiestas sofisticadas.', orden: 2 },
+    { id: 'aniversarios', nombre: 'Aniversarios y Bodas', icono: '💕', descripcion: 'Momentos románticos para celebrar el amor.', orden: 3 },
+    { id: 'reunion_familiar', nombre: 'Reuniones Familiares', icono: '👨‍👩‍👧‍👦', descripcion: 'Encuentros intergeneracionales en un entorno cuidado.', orden: 4 },
+    { id: 'encuentro_amigos', nombre: 'Encuentro de Amigos', icono: '👥', descripcion: 'Reunión distendida con formato relajado.', orden: 5 },
+    { id: 'corporativo', nombre: 'Evento Corporativo', icono: '🏢', descripcion: 'Para fomentar integración del equipo.', orden: 6 },
+    { id: 'team_building', nombre: 'Team Building', icono: '🤝', descripcion: 'Espacios de planificación y capacitación.', orden: 7 },
+    { id: 'comercial', nombre: 'Evento Comercial', icono: '💼', descripcion: 'Presentación de productos o servicios.', orden: 8 }
+];
+let motivoEnEdicion = null;
+
 let cotizacionSeleccionada = null; // Para el manejo de versiones
 let editandoCotizacion = false; // Para saber si estamos editando una cotización existente
 let cotizacionOriginalEnEdicion = null; // Para mantener referencia a la cotización original
@@ -46,6 +72,583 @@ function copiarProfundo(obj) {
         });
         return copy;
     }
+}
+
+// GESTIÓN DE EXPERIENCIAS
+function cargarExperiencias() {
+    const experienciasGuardadas = JSON.parse(localStorage.getItem('experiencias') || '[]');
+    if (experienciasGuardadas.length > 0) {
+        experiencias = experienciasGuardadas;
+    }
+}
+
+function guardarExperiencias() {
+    localStorage.setItem('experiencias', JSON.stringify(experiencias));
+}
+
+function agregarExperiencia() {
+    if (experienciaEnEdicion) {
+        actualizarExperiencia();
+        return;
+    }
+
+    const nombre = document.getElementById('nuevaExperiencia').value.trim();
+    const icono = document.getElementById('iconoExperiencia').value.trim() || '🌟';
+    const descripcion = document.getElementById('descripcionExperiencia').value.trim();
+
+    if (!nombre) {
+        mostrarAlerta('alertExperiencias', 'Por favor ingresa el nombre de la experiencia.', 'error');
+        return;
+    }
+
+    if (experiencias.some(exp => exp.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertExperiencias', 'Ya existe una experiencia con ese nombre.', 'error');
+        return;
+    }
+
+    const siguienteOrden = Math.max(...experiencias.map(e => e.orden || 0)) + 1;
+    
+    const experiencia = {
+        id: nombre.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+        nombre,
+        icono,
+        descripcion,
+        orden: siguienteOrden
+    };
+
+    experiencias.push(experiencia);
+    guardarExperiencias();
+    actualizarListaExperiencias();
+    actualizarExperienciasCheckboxes();
+    limpiarFormularioExperiencia();
+    mostrarAlerta('alertExperiencias', 'Experiencia agregada exitosamente.', 'success');
+}
+
+function actualizarExperiencia() {
+    const nombre = document.getElementById('nuevaExperiencia').value.trim();
+    const icono = document.getElementById('iconoExperiencia').value.trim() || '🌟';
+    const descripcion = document.getElementById('descripcionExperiencia').value.trim();
+
+    if (!nombre) {
+        mostrarAlerta('alertExperiencias', 'Por favor ingresa el nombre de la experiencia.', 'error');
+        return;
+    }
+
+    if (experiencias.some(exp => exp.id !== experienciaEnEdicion.id && exp.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertExperiencias', 'Ya existe una experiencia con ese nombre.', 'error');
+        return;
+    }
+
+    const index = experiencias.findIndex(exp => exp.id === experienciaEnEdicion.id);
+    if (index !== -1) {
+        experiencias[index] = {
+            ...experienciaEnEdicion,
+            nombre,
+            icono,
+            descripcion
+        };
+        
+        guardarExperiencias();
+        actualizarListaExperiencias();
+        actualizarExperienciasCheckboxes();
+        limpiarFormularioExperiencia();
+        experienciaEnEdicion = null;
+        actualizarBotonExperiencia();
+        mostrarAlerta('alertExperiencias', 'Experiencia actualizada exitosamente.', 'success');
+    }
+}
+
+function editarExperiencia(id) {
+    const experiencia = experiencias.find(exp => exp.id === id);
+    if (experiencia) {
+        experienciaEnEdicion = { ...experiencia };
+        
+        document.getElementById('nuevaExperiencia').value = experiencia.nombre;
+        document.getElementById('iconoExperiencia').value = experiencia.icono;
+        document.getElementById('descripcionExperiencia').value = experiencia.descripcion;
+        
+        actualizarBotonExperiencia();
+        document.getElementById('nuevaExperiencia').focus();
+        mostrarAlerta('alertExperiencias', 'Experiencia cargada para edición.', 'success');
+    }
+}
+
+function eliminarExperiencia(id) {
+    if (confirm('¿Estás seguro de eliminar esta experiencia?')) {
+        experiencias = experiencias.filter(exp => exp.id !== id);
+        guardarExperiencias();
+        actualizarListaExperiencias();
+        actualizarExperienciasCheckboxes();
+        mostrarAlerta('alertExperiencias', 'Experiencia eliminada exitosamente.', 'success');
+    }
+}
+
+function limpiarFormularioExperiencia() {
+    document.getElementById('nuevaExperiencia').value = '';
+    document.getElementById('iconoExperiencia').value = '';
+    document.getElementById('descripcionExperiencia').value = '';
+    experienciaEnEdicion = null;
+    actualizarBotonExperiencia();
+}
+
+function cancelarEdicionExperiencia() {
+    limpiarFormularioExperiencia();
+    mostrarAlerta('alertExperiencias', 'Edición de experiencia cancelada.', 'success');
+}
+
+function actualizarBotonExperiencia() {
+    const boton = document.querySelector('button[onclick="agregarExperiencia()"]');
+    if (boton) {
+        if (experienciaEnEdicion) {
+            boton.innerHTML = '✏️ Actualizar';
+            boton.style.background = '#f39c12';
+            
+            if (!document.getElementById('cancelarEdicionExperienciaBtn')) {
+                const cancelarBtn = document.createElement('button');
+                cancelarBtn.id = 'cancelarEdicionExperienciaBtn';
+                cancelarBtn.className = 'btn';
+                cancelarBtn.innerHTML = '❌ Cancelar';
+                cancelarBtn.onclick = cancelarEdicionExperiencia;
+                cancelarBtn.style.background = '#95a5a6';
+                boton.parentNode.insertBefore(cancelarBtn, boton.nextSibling);
+            }
+        } else {
+            boton.innerHTML = '➕ Agregar';
+            boton.style.background = '#28a745';
+            
+            const cancelarBtn = document.getElementById('cancelarEdicionExperienciaBtn');
+            if (cancelarBtn) {
+                cancelarBtn.remove();
+            }
+        }
+    }
+}
+
+function actualizarListaExperiencias() {
+    const container = document.getElementById('listaExperiencias');
+    
+    if (experiencias.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #6c757d; font-style: italic;">No hay experiencias personalizadas.</p>';
+        return;
+    }
+
+    const experienciasOrdenadas = experiencias.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">';
+    
+    experienciasOrdenadas.forEach(experiencia => {
+        html += `
+            <div style="background: white; padding: 15px; border-radius: 10px; border: 1px solid #dee2e6; border-left: 4px solid #28a745;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">${experiencia.icono}</span>
+                        <strong style="color: #28a745;">${experiencia.nombre}</strong>
+                    </div>
+                </div>
+                <p style="color: #6c757d; margin-bottom: 15px; font-size: 0.9rem;">${experiencia.descripcion || 'Sin descripción'}</p>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn" onclick="editarExperiencia('${experiencia.id}')" style="font-size: 0.8rem; padding: 6px 10px; background: #f39c12; color: white; flex: 1;">✏️ Editar</button>
+                    <button class="btn btn-danger" onclick="eliminarExperiencia('${experiencia.id}')" style="font-size: 0.8rem; padding: 6px 10px; flex: 1;">🗑️</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function actualizarExperienciasCheckboxes() {
+    const container = document.getElementById('experienciasCheckboxGroup');
+    if (!container) return;
+    
+    const experienciasOrdenadas = experiencias.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    
+    let html = '';
+    experienciasOrdenadas.forEach(experiencia => {
+        html += `
+            <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                <input type="checkbox" name="experiencia" value="${experiencia.id}">
+                <label>${experiencia.icono} ${experiencia.nombre}</label>
+                <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">${experiencia.descripcion}</p>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// GESTIÓN DE MOTIVOS DEL EVENTO
+function cargarMotivos() {
+    const motivosGuardados = JSON.parse(localStorage.getItem('motivosEvento') || '[]');
+    if (motivosGuardados.length > 0) {
+        motivosEvento = motivosGuardados;
+    }
+}
+
+function guardarMotivos() {
+    localStorage.setItem('motivosEvento', JSON.stringify(motivosEvento));
+}
+
+function agregarMotivo() {
+    if (motivoEnEdicion) {
+        actualizarMotivo();
+        return;
+    }
+
+    const nombre = document.getElementById('nuevoMotivo').value.trim();
+    const icono = document.getElementById('iconoMotivo').value.trim() || '🎉';
+    const descripcion = document.getElementById('descripcionMotivo').value.trim();
+
+    if (!nombre) {
+        mostrarAlerta('alertMotivos', 'Por favor ingresa el nombre del motivo.', 'error');
+        return;
+    }
+
+    if (motivosEvento.some(motivo => motivo.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertMotivos', 'Ya existe un motivo con ese nombre.', 'error');
+        return;
+    }
+
+    const siguienteOrden = Math.max(...motivosEvento.map(m => m.orden || 0)) + 1;
+    
+    const motivo = {
+        id: nombre.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+        nombre,
+        icono,
+        descripcion,
+        orden: siguienteOrden
+    };
+
+    motivosEvento.push(motivo);
+    guardarMotivos();
+    actualizarListaMotivos();
+    actualizarMotivosCheckboxes();
+    limpiarFormularioMotivo();
+    mostrarAlerta('alertMotivos', 'Motivo agregado exitosamente.', 'success');
+}
+
+function actualizarMotivo() {
+    const nombre = document.getElementById('nuevoMotivo').value.trim();
+    const icono = document.getElementById('iconoMotivo').value.trim() || '🎉';
+    const descripcion = document.getElementById('descripcionMotivo').value.trim();
+
+    if (!nombre) {
+        mostrarAlerta('alertMotivos', 'Por favor ingresa el nombre del motivo.', 'error');
+        return;
+    }
+
+    if (motivosEvento.some(motivo => motivo.id !== motivoEnEdicion.id && motivo.nombre.toLowerCase() === nombre.toLowerCase())) {
+        mostrarAlerta('alertMotivos', 'Ya existe un motivo con ese nombre.', 'error');
+        return;
+    }
+
+    const index = motivosEvento.findIndex(motivo => motivo.id === motivoEnEdicion.id);
+    if (index !== -1) {
+        motivosEvento[index] = {
+            ...motivoEnEdicion,
+            nombre,
+            icono,
+            descripcion
+        };
+        
+        guardarMotivos();
+        actualizarListaMotivos();
+        actualizarMotivosCheckboxes();
+        limpiarFormularioMotivo();
+        motivoEnEdicion = null;
+        actualizarBotonMotivo();
+        mostrarAlerta('alertMotivos', 'Motivo actualizado exitosamente.', 'success');
+    }
+}
+
+function editarMotivo(id) {
+    const motivo = motivosEvento.find(m => m.id === id);
+    if (motivo) {
+        motivoEnEdicion = { ...motivo };
+        
+        document.getElementById('nuevoMotivo').value = motivo.nombre;
+        document.getElementById('iconoMotivo').value = motivo.icono;
+        document.getElementById('descripcionMotivo').value = motivo.descripcion;
+        
+        actualizarBotonMotivo();
+        document.getElementById('nuevoMotivo').focus();
+        mostrarAlerta('alertMotivos', 'Motivo cargado para edición.', 'success');
+    }
+}
+
+function eliminarMotivo(id) {
+    if (confirm('¿Estás seguro de eliminar este motivo?')) {
+        motivosEvento = motivosEvento.filter(motivo => motivo.id !== id);
+        guardarMotivos();
+        actualizarListaMotivos();
+        actualizarMotivosCheckboxes();
+        mostrarAlerta('alertMotivos', 'Motivo eliminado exitosamente.', 'success');
+    }
+}
+
+function limpiarFormularioMotivo() {
+    document.getElementById('nuevoMotivo').value = '';
+    document.getElementById('iconoMotivo').value = '';
+    document.getElementById('descripcionMotivo').value = '';
+    motivoEnEdicion = null;
+    actualizarBotonMotivo();
+}
+
+function cancelarEdicionMotivo() {
+    limpiarFormularioMotivo();
+    mostrarAlerta('alertMotivos', 'Edición de motivo cancelada.', 'success');
+}
+
+function actualizarBotonMotivo() {
+    const boton = document.querySelector('button[onclick="agregarMotivo()"]');
+    if (boton) {
+        if (motivoEnEdicion) {
+            boton.innerHTML = '✏️ Actualizar';
+            boton.style.background = '#f39c12';
+            
+            if (!document.getElementById('cancelarEdicionMotivoBtn')) {
+                const cancelarBtn = document.createElement('button');
+                cancelarBtn.id = 'cancelarEdicionMotivoBtn';
+                cancelarBtn.className = 'btn';
+                cancelarBtn.innerHTML = '❌ Cancelar';
+                cancelarBtn.onclick = cancelarEdicionMotivo;
+                cancelarBtn.style.background = '#95a5a6';
+                boton.parentNode.insertBefore(cancelarBtn, boton.nextSibling);
+            }
+        } else {
+            boton.innerHTML = '➕ Agregar';
+            boton.style.background = '#007bff';
+            
+            const cancelarBtn = document.getElementById('cancelarEdicionMotivoBtn');
+            if (cancelarBtn) {
+                cancelarBtn.remove();
+            }
+        }
+    }
+}
+
+function actualizarListaMotivos() {
+    const container = document.getElementById('listaMotivos');
+    
+    if (motivosEvento.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #6c757d; font-style: italic;">No hay motivos personalizados.</p>';
+        return;
+    }
+
+    const motivosOrdenados = motivosEvento.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">';
+    
+    motivosOrdenados.forEach(motivo => {
+        html += `
+            <div style="background: white; padding: 15px; border-radius: 10px; border: 1px solid #dee2e6; border-left: 4px solid #007bff;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">${motivo.icono}</span>
+                        <strong style="color: #007bff;">${motivo.nombre}</strong>
+                    </div>
+                </div>
+                <p style="color: #6c757d; margin-bottom: 15px; font-size: 0.9rem;">${motivo.descripcion || 'Sin descripción'}</p>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn" onclick="editarMotivo('${motivo.id}')" style="font-size: 0.8rem; padding: 6px 10px; background: #f39c12; color: white; flex: 1;">✏️ Editar</button>
+                    <button class="btn btn-danger" onclick="eliminarMotivo('${motivo.id}')" style="font-size: 0.8rem; padding: 6px 10px; flex: 1;">🗑️</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function actualizarMotivosCheckboxes() {
+    const container = document.getElementById('motivosCheckboxGroup');
+    if (!container) return;
+    
+    const motivosOrdenados = motivosEvento.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    
+    let html = '';
+    motivosOrdenados.forEach(motivo => {
+        html += `
+            <div class="checkbox-item" onclick="toggleCheckbox(this)">
+                <input type="checkbox" name="motivo" value="${motivo.id}">
+                <label>${motivo.icono} ${motivo.nombre}</label>
+                <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">${motivo.descripcion}</p>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// GESTIÓN DE POLÍTICAS
+function cargarPoliticas() {
+    const politicas = localStorage.getItem('politicas') || '';
+    document.getElementById('politicas').value = politicas;
+}
+
+function guardarPoliticas() {
+    const politicas = document.getElementById('politicas').value.trim();
+    localStorage.setItem('politicas', politicas);
+    mostrarAlerta('alertPoliticas', 'Políticas guardadas exitosamente.', 'success');
+}
+
+// GESTIÓN DE PLANTILLA DE DESCARGA
+function cargarPlantilla() {
+    const plantilla = localStorage.getItem('plantillaDescarga') || obtenerPlantillaDefecto();
+    document.getElementById('plantillaDescarga').value = plantilla;
+}
+
+function guardarPlantilla() {
+    const plantilla = document.getElementById('plantillaDescarga').value;
+    localStorage.setItem('plantillaDescarga', plantilla);
+    mostrarAlerta('alertPlantilla', 'Plantilla guardada exitosamente.', 'success');
+}
+
+function restaurarPlantillaDefecto() {
+    if (confirm('¿Estás seguro de restaurar la plantilla por defecto? Se perderán todos los cambios personalizados.')) {
+        const plantillaDefecto = obtenerPlantillaDefecto();
+        document.getElementById('plantillaDescarga').value = plantillaDefecto;
+        mostrarAlerta('alertPlantilla', 'Plantilla restaurada al formato por defecto.', 'success');
+    }
+}
+
+function obtenerPlantillaDefecto() {
+    return `COTIZACIÓN DE EVENTO GASTRONÓMICO
+===============================
+
+Cliente: [cliente]
+Fecha del Evento: [fecha_evento]
+Hora: [hora_evento]
+Cantidad de Personas: [personas] ([formato])
+Estado: [estado]
+
+[motivos]
+
+[experiencias]
+
+DETALLE DEL MENÚ:
+=================
+[productos]
+
+RESUMEN FINANCIERO:
+===================
+Costo Total: $[costo_total]
+Margen: $[margen] ([porcentaje_margen]%)
+TOTAL: $[total]
+
+Cotización generada el: [fecha_cotizacion]
+
+POLÍTICAS:
+==========
+[politicas]`;
+}
+
+function previsualizarPlantilla() {
+    if (!cotizacionActual.id) {
+        mostrarAlerta('alertPlantilla', 'No hay una cotización actual para previsualizar. Ve al Cotizador y completa una cotización primero.', 'error');
+        return;
+    }
+    
+    const plantilla = document.getElementById('plantillaDescarga').value;
+    const contenidoGenerado = procesarPlantilla(plantilla, cotizacionActual);
+    
+    // Mostrar en modal
+    const modalHtml = `
+        <div id="modalPrevia" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center;" onclick="cerrarModalPrevia()">
+            <div style="background: white; border-radius: 15px; padding: 30px; max-width: 800px; max-height: 90vh; overflow-y: auto; margin: 20px;" onclick="event.stopPropagation()">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #6f42c1; padding-bottom: 15px;">
+                    <h3 style="color: #6f42c1; margin: 0;">👁️ Vista Previa de Plantilla</h3>
+                    <button onclick="cerrarModalPrevia()" style="background: #dc3545; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; font-family: 'Courier New', monospace; white-space: pre-wrap; font-size: 0.9rem; max-height: 600px; overflow-y: auto;">
+${contenidoGenerado}
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn" onclick="descargarPrevisualizacion()" style="background: #28a745; color: white;">📄 Descargar Esta Vista Previa</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function cerrarModalPrevia() {
+    const modal = document.getElementById('modalPrevia');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function descargarPrevisualizacion() {
+    const plantilla = document.getElementById('plantillaDescarga').value;
+    const contenidoGenerado = procesarPlantilla(plantilla, cotizacionActual);
+    
+    const blob = new Blob([contenidoGenerado], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `preview_cotizacion_${cotizacionActual.cliente.nombre.replace(/\s+/g, '_')}_${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    cerrarModalPrevia();
+}
+
+function procesarPlantilla(plantilla, cotizacion) {
+    const politicas = localStorage.getItem('politicas') || '';
+    
+    // Obtener nombres completos de motivos y experiencias
+    const motivosTexto = cotizacion.motivos && cotizacion.motivos.length > 0 
+        ? 'Motivo del Evento:\n' + cotizacion.motivos.map(id => {
+            const motivo = motivosEvento.find(m => m.id === id);
+            return motivo ? `- ${motivo.icono} ${motivo.nombre}` : `- ${id}`;
+        }).join('\n')
+        : '';
+    
+    const experienciasTexto = cotizacion.experiencias && cotizacion.experiencias.length > 0 
+        ? 'Experiencias Seleccionadas:\n' + cotizacion.experiencias.map(id => {
+            const experiencia = experiencias.find(e => e.id === id);
+            return experiencia ? `- ${experiencia.icono} ${experiencia.nombre}` : `- ${id}`;
+        }).join('\n')
+        : '';
+    
+    const productosTexto = cotizacion.productos && cotizacion.productos.length > 0
+        ? cotizacion.productos.map(p => 
+            `${p.nombre}\n  Precio unitario: $${p.precio.toFixed(2)}\n  Cantidad: ${p.cantidad}\n  Subtotal: $${p.subtotal.toFixed(2)}`
+        ).join('\n\n')
+        : 'No hay productos seleccionados';
+    
+    // Obtener nombre del estado
+    const estadoCotizacion = estadosCotizacion.find(est => est.id === cotizacion.estado) || { nombre: 'Sin estado', icono: '❓' };
+    const estadoTexto = `${estadoCotizacion.icono} ${estadoCotizacion.nombre}`;
+    
+    let contenido = plantilla;
+    
+    // Reemplazar variables
+    contenido = contenido.replace(/\[cliente\]/g, cotizacion.cliente?.nombre || '');
+    contenido = contenido.replace(/\[fecha_evento\]/g, cotizacion.cliente?.fechaEvento || '');
+    contenido = contenido.replace(/\[hora_evento\]/g, cotizacion.cliente?.horaEvento || '');
+    contenido = contenido.replace(/\[personas\]/g, cotizacion.cliente?.cantidadPersonas || '');
+    contenido = contenido.replace(/\[formato\]/g, cotizacion.cliente?.formatoEvento || '');
+    contenido = contenido.replace(/\[estado\]/g, estadoTexto);
+    contenido = contenido.replace(/\[motivos\]/g, motivosTexto);
+    contenido = contenido.replace(/\[experiencias\]/g, experienciasTexto);
+    contenido = contenido.replace(/\[productos\]/g, productosTexto);
+    contenido = contenido.replace(/\[total\]/g, cotizacion.totales?.subtotal?.toFixed(2) || '0.00');
+    contenido = contenido.replace(/\[costo_total\]/g, cotizacion.totales?.costoTotal?.toFixed(2) || '0.00');
+    contenido = contenido.replace(/\[margen\]/g, cotizacion.totales?.margenTotal?.toFixed(2) || '0.00');
+    contenido = contenido.replace(/\[porcentaje_margen\]/g, cotizacion.totales?.porcentajeMargen || '0');
+    contenido = contenido.replace(/\[fecha_cotizacion\]/g, cotizacion.fechaCotizacion || '');
+    contenido = contenido.replace(/\[politicas\]/g, politicas);
+    
+    return contenido;
 }
 
 // Función para actualizar el resumen en tiempo real
@@ -139,27 +742,16 @@ function mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, forma
     const container = document.getElementById('resumenCotizacion');
     const estadoCotizacion = estadosCotizacion.find(est => est.id === estadoSeleccionado) || estadosCotizacion[0];
 
-    const motivosTexto = {
-        'cumpleanos': '🎂 Cumpleaños',
-        'celebracion_especial': '✨ Celebración Especial',
-        'aniversarios': '💕 Aniversarios y Bodas',
-        'reunion_familiar': '👨‍👩‍👧‍👦 Reuniones Familiares',
-        'encuentro_amigos': '👥 Encuentro de Amigos',
-        'corporativo': '🏢 Evento Corporativo',
-        'team_building': '🤝 Team Building',
-        'comercial': '💼 Evento Comercial'
-    };
+    // Obtener nombres completos
+    const motivosTexto = motivosSeleccionados.map(id => {
+        const motivo = motivosEvento.find(m => m.id === id);
+        return motivo ? `${motivo.icono} ${motivo.nombre}` : id;
+    });
 
-    const experienciasTexto = {
-        'cena_almuerzo': '🍽️ Cenas/Almuerzo',
-        'cena_maridada': '🍷 Cenas Maridadas por Pasos',
-        'cata_vinos': '🍾 Cata de Vinos',
-        'finger_food': '🥂 Finger Food & Lounge',
-        'after_office': '🌆 After Office',
-        'cocteles': '🍸 Cócteles de Autor',
-        'show_cooking': '👨‍🍳 Show Cooking',
-        'brunch': '🥞 Brunch'
-    };
+    const experienciasTexto = experienciasSeleccionadas.map(id => {
+        const experiencia = experiencias.find(e => e.id === id);
+        return experiencia ? `${experiencia.icono} ${experiencia.nombre}` : id;
+    });
 
     let html = `
         <div class="cotizacion-resumen">
@@ -195,7 +787,7 @@ function mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, forma
                 <div style="margin-bottom: 20px;">
                     <h4 style="color: #2c3e50; margin-bottom: 10px;">Motivo del Evento:</h4>
                     <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                        ${motivosSeleccionados.map(m => `<span style="background: #667eea; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${motivosTexto[m] || m}</span>`).join('')}
+                        ${motivosTexto.map(m => `<span style="background: #667eea; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${m}</span>`).join('')}
                     </div>
                 </div>
             ` : ''}
@@ -204,7 +796,7 @@ function mostrarResumenVacio(nombreCliente, fechaEvento, cantidadPersonas, forma
                 <div style="margin-bottom: 20px;">
                     <h4 style="color: #2c3e50; margin-bottom: 10px;">Experiencias Seleccionadas:</h4>
                     <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                        ${experienciasSeleccionadas.map(e => `<span style="background: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${experienciasTexto[e] || e}</span>`).join('')}
+                        ${experienciasTexto.map(e => `<span style="background: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${e}</span>`).join('')}
                     </div>
                 </div>
             ` : ''}
@@ -1410,27 +2002,16 @@ function mostrarResumenCotizacion() {
     const container = document.getElementById('resumenCotizacion');
     const cot = cotizacionActual;
 
-    const motivosTexto = {
-        'cumpleanos': '🎂 Cumpleaños',
-        'celebracion_especial': '✨ Celebración Especial',
-        'aniversarios': '💕 Aniversarios y Bodas',
-        'reunion_familiar': '👨‍👩‍👧‍👦 Reuniones Familiares',
-        'encuentro_amigos': '👥 Encuentro de Amigos',
-        'corporativo': '🏢 Evento Corporativo',
-        'team_building': '🤝 Team Building',
-        'comercial': '💼 Evento Comercial'
-    };
+    // Obtener nombres completos de motivos y experiencias
+    const motivosTexto = cot.motivos.map(id => {
+        const motivo = motivosEvento.find(m => m.id === id);
+        return motivo ? `${motivo.icono} ${motivo.nombre}` : id;
+    });
 
-    const experienciasTexto = {
-        'cena_almuerzo': '🍽️ Cenas/Almuerzo',
-        'cena_maridada': '🍷 Cenas Maridadas por Pasos',
-        'cata_vinos': '🍾 Cata de Vinos',
-        'finger_food': '🥂 Finger Food & Lounge',
-        'after_office': '🌆 After Office',
-        'cocteles': '🍸 Cócteles de Autor',
-        'show_cooking': '👨‍🍳 Show Cooking',
-        'brunch': '🥞 Brunch'
-    };
+    const experienciasTexto = cot.experiencias.map(id => {
+        const experiencia = experiencias.find(e => e.id === id);
+        return experiencia ? `${experiencia.icono} ${experiencia.nombre}` : id;
+    });
 
     // Obtener información del estado
     const estadoCotizacion = estadosCotizacion.find(est => est.id === cot.estado) || estadosCotizacion[0];
@@ -1469,7 +2050,7 @@ function mostrarResumenCotizacion() {
                 <div style="margin-bottom: 20px;">
                     <h4 style="color: #2c3e50; margin-bottom: 10px;">Motivo del Evento:</h4>
                     <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                        ${cot.motivos.map(m => `<span style="background: #667eea; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${motivosTexto[m] || m}</span>`).join('')}
+                        ${motivosTexto.map(m => `<span style="background: #667eea; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${m}</span>`).join('')}
                     </div>
                 </div>
             ` : ''}
@@ -1478,7 +2059,7 @@ function mostrarResumenCotizacion() {
                 <div style="margin-bottom: 20px;">
                     <h4 style="color: #2c3e50; margin-bottom: 10px;">Experiencias Seleccionadas:</h4>
                     <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                        ${cot.experiencias.map(e => `<span style="background: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${experienciasTexto[e] || e}</span>`).join('')}
+                        ${experienciasTexto.map(e => `<span style="background: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem;">${e}</span>`).join('')}
                     </div>
                 </div>
             ` : ''}
@@ -1789,45 +2370,11 @@ function descargarCotizacion() {
         return;
     }
 
-    // Crear contenido del archivo
-    let contenido = `COTIZACIÓN DE EVENTO GASTRONÓMICO\n`;
-    contenido += `===============================\n\n`;
-    contenido += `Cliente: ${cotizacionActual.cliente.nombre}\n`;
-    contenido += `Fecha del Evento: ${cotizacionActual.cliente.fechaEvento}\n`;
-    contenido += `Hora: ${cotizacionActual.cliente.horaEvento}\n`;
-    contenido += `Cantidad de Personas: ${cotizacionActual.cliente.cantidadPersonas} (${cotizacionActual.cliente.formatoEvento})\n\n`;
-
-    if (cotizacionActual.motivos.length > 0) {
-        contenido += `Motivo del Evento:\n`;
-        cotizacionActual.motivos.forEach(motivo => {
-            contenido += `- ${motivo}\n`;
-        });
-        contenido += `\n`;
-    }
-
-    if (cotizacionActual.experiencias.length > 0) {
-        contenido += `Experiencias Seleccionadas:\n`;
-        cotizacionActual.experiencias.forEach(exp => {
-            contenido += `- ${exp}\n`;
-        });
-        contenido += `\n`;
-    }
-
-    contenido += `DETALLE DEL MENÚ:\n`;
-    contenido += `=================\n`;
-    cotizacionActual.productos.forEach(producto => {
-        contenido += `${producto.nombre}\n`;
-        contenido += `  Precio unitario: $${producto.precio.toFixed(2)}\n`;
-        contenido += `  Cantidad: ${producto.cantidad}\n`;
-        contenido += `  Subtotal: $${producto.subtotal.toFixed(2)}\n\n`;
-    });
-
-    contenido += `RESUMEN FINANCIERO:\n`;
-    contenido += `===================\n`;
-    contenido += `Costo Total: $${cotizacionActual.totales.costoTotal.toFixed(2)}\n`;
-    contenido += `Margen: $${cotizacionActual.totales.margenTotal.toFixed(2)} (${cotizacionActual.totales.porcentajeMargen}%)\n`;
-    contenido += `TOTAL: $${cotizacionActual.totales.subtotal.toFixed(2)}\n\n`;
-    contenido += `Cotización generada el: ${cotizacionActual.fechaCotizacion}\n`;
+    // Obtener plantilla personalizada o usar la por defecto
+    const plantilla = localStorage.getItem('plantillaDescarga') || obtenerPlantillaDefecto();
+    
+    // Procesar la plantilla con los datos de la cotización
+    const contenido = procesarPlantilla(plantilla, cotizacionActual);
 
     // Descargar archivo
     const blob = new Blob([contenido], { type: 'text/plain' });
@@ -1862,13 +2409,21 @@ function mostrarAlerta(containerId, mensaje, tipo) {
 document.addEventListener('DOMContentLoaded', function() {
     cargarCategorias();
     cargarEstados();
+    cargarExperiencias();
+    cargarMotivos();
+    cargarPoliticas();
+    cargarPlantilla();
     cargarProductos();
     actualizarSelectCategorias();
     actualizarSelectEstados();
     actualizarListaCategorias();
     actualizarListaEstados();
+    actualizarListaExperiencias();
+    actualizarListaMotivos();
     actualizarListaProductos();
     actualizarMenuSelector();
+    actualizarExperienciasCheckboxes();
+    actualizarMotivosCheckboxes();
     cargarHistorialCotizaciones();
     
     // Agregar eventos para actualización en tiempo real
@@ -2293,14 +2848,22 @@ function exportarBaseDatos() {
     const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones') || '[]');
     const categorias = JSON.parse(localStorage.getItem('categorias') || '[]');
     const estadosCotizacion = JSON.parse(localStorage.getItem('estadosCotizacion') || '[]');
+    const experiencias = JSON.parse(localStorage.getItem('experiencias') || '[]');
+    const motivosEvento = JSON.parse(localStorage.getItem('motivosEvento') || '[]');
+    const politicas = localStorage.getItem('politicas') || '';
+    const plantillaDescarga = localStorage.getItem('plantillaDescarga') || '';
     
     const baseDatos = {
         productos: productos,
         cotizaciones: cotizaciones,
         categorias: categorias,
         estadosCotizacion: estadosCotizacion,
+        experiencias: experiencias,
+        motivosEvento: motivosEvento,
+        politicas: politicas,
+        plantillaDescarga: plantillaDescarga,
         fechaExportacion: new Date().toISOString(),
-        version: '2.0'
+        version: '3.0'
     };
     
     const contenidoJSON = JSON.stringify(baseDatos, null, 2);
@@ -2315,7 +2878,7 @@ function exportarBaseDatos() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    mostrarAlerta('alertHistorial', `Base de datos exportada: ${productos.length} productos, ${cotizaciones.length} cotizaciones, ${categorias.length} categorías y ${estadosCotizacion.length} estados.`, 'success');
+    mostrarAlerta('alertHistorial', `Base de datos exportada: ${productos.length} productos, ${cotizaciones.length} cotizaciones, ${categorias.length} categorías, ${estadosCotizacion.length} estados, ${experiencias.length} experiencias y ${motivosEvento.length} motivos.`, 'success');
 }
 
 function importarBaseDatos() {
@@ -2336,16 +2899,28 @@ function importarBaseDatos() {
                     throw new Error('Formato de archivo inválido');
                 }
                 
-                if (confirm(`¿Estás seguro de importar esta base de datos?\nProductos: ${baseDatos.productos.length}\nCotizaciones: ${baseDatos.cotizaciones.length}\nCategorías: ${baseDatos.categorias?.length || 0}\nEstados: ${baseDatos.estadosCotizacion?.length || 0}\n\nEsto REEMPLAZARÁ todos los datos actuales.`)) {
+                if (confirm(`¿Estás seguro de importar esta base de datos?\nProductos: ${baseDatos.productos.length}\nCotizaciones: ${baseDatos.cotizaciones.length}\nCategorías: ${baseDatos.categorias?.length || 0}\nEstados: ${baseDatos.estadosCotizacion?.length || 0}\nExperiencias: ${baseDatos.experiencias?.length || 0}\nMotivos: ${baseDatos.motivosEvento?.length || 0}\n\nEsto REEMPLAZARÁ todos los datos actuales.`)) {
                     localStorage.setItem('productos', JSON.stringify(baseDatos.productos));
                     localStorage.setItem('cotizaciones', JSON.stringify(baseDatos.cotizaciones));
                     
-                    // Importar categorías y estados si existen
+                    // Importar todos los nuevos campos
                     if (baseDatos.categorias) {
                         localStorage.setItem('categorias', JSON.stringify(baseDatos.categorias));
                     }
                     if (baseDatos.estadosCotizacion) {
                         localStorage.setItem('estadosCotizacion', JSON.stringify(baseDatos.estadosCotizacion));
+                    }
+                    if (baseDatos.experiencias) {
+                        localStorage.setItem('experiencias', JSON.stringify(baseDatos.experiencias));
+                    }
+                    if (baseDatos.motivosEvento) {
+                        localStorage.setItem('motivosEvento', JSON.stringify(baseDatos.motivosEvento));
+                    }
+                    if (baseDatos.politicas) {
+                        localStorage.setItem('politicas', baseDatos.politicas);
+                    }
+                    if (baseDatos.plantillaDescarga) {
+                        localStorage.setItem('plantillaDescarga', baseDatos.plantillaDescarga);
                     }
                     
                     // Actualizar las variables globales
@@ -2356,17 +2931,29 @@ function importarBaseDatos() {
                     if (baseDatos.estadosCotizacion) {
                         estadosCotizacion = baseDatos.estadosCotizacion;
                     }
+                    if (baseDatos.experiencias) {
+                        experiencias = baseDatos.experiencias;
+                    }
+                    if (baseDatos.motivosEvento) {
+                        motivosEvento = baseDatos.motivosEvento;
+                    }
                     
                     // Actualizar todas las vistas
                     actualizarSelectCategorias();
                     actualizarSelectEstados();
                     actualizarListaCategorias();
                     actualizarListaEstados();
+                    actualizarListaExperiencias();
+                    actualizarListaMotivos();
                     actualizarListaProductos();
                     actualizarMenuSelector();
+                    actualizarExperienciasCheckboxes();
+                    actualizarMotivosCheckboxes();
                     cargarHistorialCotizaciones();
+                    cargarPoliticas();
+                    cargarPlantilla();
                     
-                    mostrarAlerta('alertHistorial', `Base de datos importada exitosamente: ${baseDatos.productos.length} productos, ${baseDatos.cotizaciones.length} cotizaciones, ${baseDatos.categorias?.length || 0} categorías y ${baseDatos.estadosCotizacion?.length || 0} estados.`, 'success');
+                    mostrarAlerta('alertHistorial', `Base de datos importada exitosamente: ${baseDatos.productos.length} productos, ${baseDatos.cotizaciones.length} cotizaciones, ${baseDatos.categorias?.length || 0} categorías, ${baseDatos.estadosCotizacion?.length || 0} estados, ${baseDatos.experiencias?.length || 0} experiencias y ${baseDatos.motivosEvento?.length || 0} motivos.`, 'success');
                 }
             } catch (error) {
                 mostrarAlerta('alertHistorial', 'Error al importar: archivo inválido o corrupto.', 'error');
@@ -2626,10 +3213,18 @@ function compararVersion(cotizacionId, numeroVersion) {
     function generarResumenAdicionales(motivos, experiencias) {
         let html = '';
         if (motivos && motivos.length > 0) {
-            html += '<div style="margin-bottom: 10px;"><strong>Motivos:</strong><br>' + motivos.join(', ') + '</div>';
+            const motivosTexto = motivos.map(id => {
+                const motivo = motivosEvento.find(m => m.id === id);
+                return motivo ? `${motivo.icono} ${motivo.nombre}` : id;
+            });
+            html += '<div style="margin-bottom: 10px;"><strong>Motivos:</strong><br>' + motivosTexto.join(', ') + '</div>';
         }
         if (experiencias && experiencias.length > 0) {
-            html += '<div><strong>Experiencias:</strong><br>' + experiencias.join(', ') + '</div>';
+            const experienciasTexto = experiencias.map(id => {
+                const experiencia = experiencias.find(e => e.id === id);
+                return experiencia ? `${experiencia.icono} ${experiencia.nombre}` : id;
+            });
+            html += '<div><strong>Experiencias:</strong><br>' + experienciasTexto.join(', ') + '</div>';
         }
         return html || '<p style="color: #6c757d; font-style: italic;">Sin motivos o experiencias</p>';
     }
